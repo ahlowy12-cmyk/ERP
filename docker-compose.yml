@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  petroflow-api:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/petroflow_erp
+      - JWT_SECRET=production_secret_key
+    depends_on:
+      - mongo
+    restart: always
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - '27017:27017'
+    volumes:
+      - petroflow_data:/data/db
+    restart: always
+
+volumes:
+  petroflow_data:
