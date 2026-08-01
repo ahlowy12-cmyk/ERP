@@ -7,6 +7,7 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Public } from 'src/common/decorators/is-public.decorator';
@@ -32,7 +33,7 @@ export class AuthController {
       dto.username,
       dto.password,
     );
-    if (!user) throw new Error('Invalid credentials');
+    if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const ip =
       (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress;
