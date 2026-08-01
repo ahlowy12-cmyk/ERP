@@ -17,7 +17,10 @@ import { RequirePermissions } from 'src/common/decorators/permissions.decorator'
 import { UserRole } from 'src/DB/enums/user.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UpdateUserRoleDto, UpdateUserStatusDto } from './dto/update-user-role.dto';
+import {
+  UpdateUserRoleDto,
+  UpdateUserStatusDto,
+} from './dto/update-user-role.dto';
 
 @Controller('admin/users')
 @Roles(UserRole.SuperAdmin, UserRole.GeneralManager)
@@ -35,7 +38,14 @@ export class UsersController {
     @Query('departmentId') departmentId?: string,
     @Query('status') status?: string,
   ) {
-    return this.usersService.findAll({ page, limit, search, roleId, departmentId, status });
+    return this.usersService.findAll({
+      page,
+      limit,
+      search,
+      roleId,
+      departmentId,
+      status,
+    });
   }
 
   // GET /admin/users/:id

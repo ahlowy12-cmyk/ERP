@@ -9,12 +9,16 @@ import { NumberingService } from 'src/shared/services/numbering.service';
 import { InventoryEngineService } from 'src/shared/services/inventory-engine.service';
 import { AuditLogService } from 'src/shared/audit-logs/audit-logs.service';
 import { AdjustmentsRepository } from './adjustments.repository';
-import { StockAdjustmentModelName, StockAdjustmentDocument } from './entities/adjustment.model';
+import {
+  StockAdjustmentModelName,
+  StockAdjustmentDocument,
+} from './entities/adjustment.model';
 
 @Injectable()
 export class AdjustmentsService {
   constructor(
-    @InjectModel(StockAdjustmentModelName) private readonly adjustmentModel: Model<StockAdjustmentDocument>,
+    @InjectModel(StockAdjustmentModelName)
+    private readonly adjustmentModel: Model<StockAdjustmentDocument>,
     @InjectConnection() private readonly connection: Connection,
     private readonly numberingService: NumberingService,
     private readonly inventoryEngineService: InventoryEngineService,
@@ -56,7 +60,10 @@ export class AdjustmentsService {
   }
 
   async findAll(query?: any) {
-    return this.adjustmentModel.find(query || {}).populate('warehouseId').exec();
+    return this.adjustmentModel
+      .find(query || {})
+      .populate('warehouseId')
+      .exec();
   }
 
   async findOne(id: string) {

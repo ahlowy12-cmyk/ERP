@@ -3,7 +3,7 @@ import { HydratedDocument } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Counter {
-  @Prop({ type: String, required: true, unique: true })
+  @Prop({ type: String })
   _id!: string; // مثال: 'PR', 'PO', 'MRV'
 
   @Prop({ type: Number, default: 0 })

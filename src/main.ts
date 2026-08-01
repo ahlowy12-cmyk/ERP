@@ -5,6 +5,14 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import helmet from 'helmet';
+import * as dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+} catch (e) {
+  console.warn('Failed to set custom DNS servers:', e);
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -13,11 +21,12 @@ async function bootstrap() {
   app.use(helmet());
 
   // 2. تفعيل الـ CORS والسماح لدومين الفرونت إند فقط بالاتصال
-  app.enableCors({
-    origin: process.env.ALLOWED_ORIGIN || 'https://erp.petroflow.com',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-  });
+   app.enableCors()
+ // {
+  //   origin: process.env.ALLOWED_ORIGIN || 'https://erp.petroflow.com',
+  //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  //   credentials: true,
+  // });
 
   // 3. تفعيل جدار الحماية للبيانات (Validation Pipe) عالمياً باستخدام الـ DTOs
   app.useGlobalPipes(

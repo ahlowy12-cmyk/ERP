@@ -10,7 +10,8 @@ import {
   Matches,
 } from 'class-validator';
 
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$!%*])[A-Za-z\d@#$!%*]{8,128}$/;
+const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$!%*])[A-Za-z\d@#$!%*]{8,128}$/;
 
 export class CreateUserDto {
   @IsString()
@@ -33,10 +34,11 @@ export class CreateUserDto {
   @MinLength(8)
   @MaxLength(128)
   @Matches(PASSWORD_REGEX, {
-    message: 'Password must contain uppercase, lowercase, number and special char',
+    message:
+      'Password must contain uppercase, lowercase, number and special char',
   })
   @IsOptional()
-  password?: string;  // إذا لم يُرسَل، سيتم توليد كلمة سر مؤقتة تلقائياً
+  password?: string; // إذا لم يُرسَل، سيتم توليد كلمة سر مؤقتة تلقائياً
 
   @IsMongoId()
   @IsNotEmpty()

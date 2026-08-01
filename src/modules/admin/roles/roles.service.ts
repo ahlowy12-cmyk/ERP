@@ -26,7 +26,11 @@ export class RolesService {
   async findAll() {
     return this.roleModel
       .find()
-      .populate({ path: 'permissions', model: PermissionModelName, select: 'name description module' })
+      .populate({
+        path: 'permissions',
+        model: PermissionModelName,
+        select: 'name description module',
+      })
       .lean()
       .exec();
   }
@@ -45,7 +49,8 @@ export class RolesService {
   // ─── Create Role ──────────────────────────────────────────────────────────
   async create(dto: CreateRoleDto, createdBy: string) {
     const exists = await this.roleModel.findOne({ name: dto.name });
-    if (exists) throw new ConflictException(`Role "${dto.name}" already exists`);
+    if (exists)
+      throw new ConflictException(`Role "${dto.name}" already exists`);
 
     const permIds = dto.permissions?.map((p) => new Types.ObjectId(p)) || [];
     const role = await this.roleModel.create({ ...dto, permissions: permIds });
@@ -73,7 +78,9 @@ export class RolesService {
     if (dto.nameAr !== undefined) updateData.nameAr = dto.nameAr;
     if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.permissions !== undefined) {
-      updateData.permissions = dto.permissions.map((p) => new Types.ObjectId(p));
+      updateData.permissions = dto.permissions.map(
+        (p) => new Types.ObjectId(p),
+      );
     }
 
     const updated = await this.roleModel
@@ -97,7 +104,8 @@ export class RolesService {
   async remove(id: string, deletedBy: string) {
     const role = await this.roleModel.findById(id);
     if (!role) throw new NotFoundException('Role not found');
-    if (role.isSystem) throw new ForbiddenException('Cannot delete a system role');
+    if (role.isSystem)
+      throw new ForbiddenException('Cannot delete a system role');
 
     await this.roleModel.deleteOne({ _id: id });
 
@@ -114,6 +122,10 @@ export class RolesService {
 
   // ─── Get All Permissions ──────────────────────────────────────────────────
   async getAllPermissions() {
-    return this.permissionModel.find().sort({ module: 1, name: 1 }).lean().exec();
+    return this.permissionModel
+      .find()
+      .sort({ module: 1, name: 1 })
+      .lean()
+      .exec();
   }
 }

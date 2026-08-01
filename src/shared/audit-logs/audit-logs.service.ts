@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AuditLogDocument, AuditLogModelName } from './entities/audit-log.model';
+import {
+  AuditLogDocument,
+  AuditLogModelName,
+} from './entities/audit-log.model';
 
 @Injectable()
 export class AuditLogService {

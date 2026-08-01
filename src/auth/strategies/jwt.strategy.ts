@@ -46,7 +46,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // جلب الصلاحيات الفعلية من قاعدة البيانات عبر الدور
-    const role = user.roleId as any;
+    const role = user.roleId;
     let permissions: string[] = [];
 
     if (role && role.permissions && role.permissions.length > 0) {

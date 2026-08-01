@@ -89,11 +89,7 @@ export abstract class AbstractRepository<TDocument extends Document> {
     options?: QueryOptions,
   ): Promise<any> {
     return this.model
-      .updateMany(
-        filterQuery,
-        { $set: { status: 'Inactive' } } as any,
-        options as any,
-      )
+      .updateMany(filterQuery, { $set: { status: 'Inactive' } }, options as any)
       .exec();
   }
 }

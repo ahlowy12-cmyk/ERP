@@ -28,10 +28,14 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    const user = await this.authService.validateUser(dto.username, dto.password);
+    const user = await this.authService.validateUser(
+      dto.username,
+      dto.password,
+    );
     if (!user) throw new Error('Invalid credentials');
 
-    const ip = (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress;
+    const ip =
+      (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress;
     const device = req.headers['user-agent'];
     return this.authService.login(user, dto.rememberMe, ip, device);
   }
@@ -47,7 +51,10 @@ export class AuthController {
   // ✅ POST /auth/logout
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout(@CurrentUser('id') userId: string, @Body() body: { refreshToken?: string }) {
+  logout(
+    @CurrentUser('id') userId: string,
+    @Body() body: { refreshToken?: string },
+  ) {
     return this.authService.logout(userId, body.refreshToken);
   }
 
@@ -75,7 +82,10 @@ export class AuthController {
 
   // ✅ PATCH /auth/me/password
   @Patch('me/password')
-  changePassword(@CurrentUser('id') userId: string, @Body() dto: ChangePasswordDto) {
+  changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
     return this.authService.changePassword(
       userId,
       dto.currentPassword,
@@ -86,7 +96,10 @@ export class AuthController {
 
   // ✅ PATCH /auth/me/profile
   @Patch('me/profile')
-  updateProfile(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {
+  updateProfile(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateProfileDto,
+  ) {
     return this.authService.updateProfile(userId, dto);
   }
 }

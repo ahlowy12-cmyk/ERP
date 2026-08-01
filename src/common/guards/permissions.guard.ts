@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/is-public.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
@@ -25,7 +30,9 @@ export class PermissionsGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
 
     if (!user || !user.permissions) {
-      throw new ForbiddenException('Access denied. User permissions are missing.');
+      throw new ForbiddenException(
+        'Access denied. User permissions are missing.',
+      );
     }
 
     // Super Admin يمر دائماً

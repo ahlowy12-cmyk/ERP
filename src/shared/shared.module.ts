@@ -17,7 +17,12 @@ import { ReportsModule } from 'src/modules/inventory/reports/reports.module';
     ItemsModule, // لكي نتمكن من حقن InventoryItemRepository
     ReportsModule, // لكي نتمكن من حقن ItemLedgerRepository
   ],
-  providers: [NumberingService, InventoryEngineService, AuditLogService, AuditLogsRepository],
+  providers: [
+    NumberingService,
+    InventoryEngineService,
+    AuditLogService,
+    AuditLogsRepository,
+  ],
   exports: [
     NumberingService,
     InventoryEngineService,

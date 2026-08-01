@@ -19,12 +19,8 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { UserModelName } from 'src/modules/admin/users/entities/user.model';
 import { RoleModelName } from 'src/modules/admin/roles/entities/role.model';
 import { PermissionModelName } from 'src/modules/admin/roles/entities/permission.model';
-import {
-  RefreshTokenModelName,
-} from 'src/modules/admin/users/entities/refresh-token.model';
-import {
-  PasswordResetTokenModelName,
-} from 'src/modules/admin/users/entities/password-reset-token.model';
+import { RefreshTokenModelName } from 'src/modules/admin/users/entities/refresh-token.model';
+import { PasswordResetTokenModelName } from 'src/modules/admin/users/entities/password-reset-token.model';
 import { AuditLogService } from 'src/shared/audit-logs/audit-logs.service';
 
 const BCRYPT_ROUNDS = 12;
@@ -42,7 +38,8 @@ export class AuthService {
     @InjectModel(RoleModelName) private roleModel: Model<any>,
     @InjectModel(PermissionModelName) private permissionModel: Model<any>,
     @InjectModel(RefreshTokenModelName) private refreshTokenModel: Model<any>,
-    @InjectModel(PasswordResetTokenModelName) private resetTokenModel: Model<any>,
+    @InjectModel(PasswordResetTokenModelName)
+    private resetTokenModel: Model<any>,
     @InjectConnection() private connection: Connection,
     private jwtService: JwtService,
     private configService: ConfigService,
@@ -88,12 +85,19 @@ export class AuthService {
   }
 
   // ─── Login ────────────────────────────────────────────────────────────────
-  async login(user: any, rememberMe = false, ipAddress?: string, deviceInfo?: string) {
+  async login(
+    user: any,
+    rememberMe = false,
+    ipAddress?: string,
+    deviceInfo?: string,
+  ) {
     if (user.status !== 'Active') {
-      throw new ForbiddenException('Your account is not active. Please contact admin.');
+      throw new ForbiddenException(
+        'Your account is not active. Please contact admin.',
+      );
     }
 
-    const role = user.roleId as any;
+    const role = user.roleId;
     const permissions = await this._getPermissions(role?.permissions || []);
 
     const accessTokenPayload = {
@@ -111,10 +115,15 @@ export class AuthService {
 
     // توليد Refresh Token
     const rawRefreshToken = crypto.randomBytes(64).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawRefreshToken)
+      .digest('hex');
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + (rememberMe ? 30 : REFRESH_TOKEN_EXPIRY_DAYS));
+    expiresAt.setDate(
+      expiresAt.getDate() + (rememberMe ? 30 : REFRESH_TOKEN_EXPIRY_DAYS),
+    );
 
     await this.refreshTokenModel.create({
       userId: user._id,
@@ -146,7 +155,11 @@ export class AuthService {
     const departmentId = user.departmentId;
     let department: any = null;
     if (departmentId) {
-      department = await this.connection.model('Department').findById(departmentId).lean().exec();
+      department = await this.connection
+        .model('Department')
+        .findById(departmentId)
+        .lean()
+        .exec();
     }
 
     return {
@@ -172,16 +185,22 @@ export class AuthService {
 
   // ─── Refresh Token ────────────────────────────────────────────────────────
   async refreshToken(rawToken: string) {
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
 
     const stored = await this.refreshTokenModel
       .findOne({ tokenHash, revoked: false })
       .exec();
 
-    if (!stored) throw new UnauthorizedException('Invalid or expired refresh token');
+    if (!stored)
+      throw new UnauthorizedException('Invalid or expired refresh token');
     if (new Date(stored.expiresAt) < new Date()) {
       await this.refreshTokenModel.deleteOne({ _id: stored._id });
-      throw new UnauthorizedException('Refresh token expired. Please login again.');
+      throw new UnauthorizedException(
+        'Refresh token expired. Please login again.',
+      );
     }
 
     const user = await this.userModel
@@ -194,7 +213,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    const role = user.roleId as any;
+    const role = user.roleId;
     const permissions = await this._getPermissions(role?.permissions || []);
 
     const accessToken = this.jwtService.sign(
@@ -213,7 +232,10 @@ export class AuthService {
     await this.refreshTokenModel.deleteOne({ _id: stored._id });
 
     const newRawToken = crypto.randomBytes(64).toString('hex');
-    const newHash = crypto.createHash('sha256').update(newRawToken).digest('hex');
+    const newHash = crypto
+      .createHash('sha256')
+      .update(newRawToken)
+      .digest('hex');
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
 
@@ -223,17 +245,29 @@ export class AuthService {
       expiresAt,
     });
 
-    return { accessToken, refreshToken: newRawToken, expiresIn: ACCESS_TOKEN_EXPIRY };
+    return {
+      accessToken,
+      refreshToken: newRawToken,
+      expiresIn: ACCESS_TOKEN_EXPIRY,
+    };
   }
 
   // ─── Logout ───────────────────────────────────────────────────────────────
   async logout(userId: string, rawRefreshToken?: string) {
     if (rawRefreshToken) {
-      const tokenHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
-      await this.refreshTokenModel.deleteOne({ userId: new Types.ObjectId(userId), tokenHash });
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(rawRefreshToken)
+        .digest('hex');
+      await this.refreshTokenModel.deleteOne({
+        userId: new Types.ObjectId(userId),
+        tokenHash,
+      });
     } else {
       // إلغاء جميع Refresh Tokens
-      await this.refreshTokenModel.deleteMany({ userId: new Types.ObjectId(userId) });
+      await this.refreshTokenModel.deleteMany({
+        userId: new Types.ObjectId(userId),
+      });
     }
 
     try {
@@ -260,9 +294,9 @@ export class AuthService {
 
     if (!user) throw new NotFoundException('User not found');
 
-    const role = user.roleId as any;
+    const role = user.roleId;
     const permissions = await this._getPermissions(role?.permissions || []);
-    const department = user.departmentId as any;
+    const department = user.departmentId;
 
     return {
       id: user._id.toString(),
@@ -274,7 +308,11 @@ export class AuthService {
       roleName: role?.nameAr,
       permissions,
       department: department
-        ? { code: department.code, nameEn: department.nameEn, nameAr: department.nameAr }
+        ? {
+            code: department.code,
+            nameEn: department.nameEn,
+            nameAr: department.nameAr,
+          }
         : null,
       avatar: user.avatar,
       avatarUrl: user.avatarUrl,
@@ -287,16 +325,24 @@ export class AuthService {
   }
 
   // ─── Change Password ──────────────────────────────────────────────────────
-  async changePassword(userId: string, currentPassword: string, newPassword: string, confirmPassword: string) {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string,
+  ) {
     if (newPassword !== confirmPassword) {
-      throw new BadRequestException('New password and confirmation do not match');
+      throw new BadRequestException(
+        'New password and confirmation do not match',
+      );
     }
 
     const user = await this.userModel.findById(userId).exec();
     if (!user) throw new NotFoundException('User not found');
 
     const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!isMatch) throw new BadRequestException('Current password is incorrect');
+    if (!isMatch)
+      throw new BadRequestException('Current password is incorrect');
 
     const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await this.userModel.updateOne(
@@ -311,7 +357,9 @@ export class AuthService {
     );
 
     // إلغاء جميع Refresh Tokens لإجبار إعادة الدخول
-    await this.refreshTokenModel.deleteMany({ userId: new Types.ObjectId(userId) });
+    await this.refreshTokenModel.deleteMany({
+      userId: new Types.ObjectId(userId),
+    });
 
     try {
       await this.auditLogService.log({
@@ -328,7 +376,13 @@ export class AuthService {
 
   // ─── Update Profile ───────────────────────────────────────────────────────
   async updateProfile(userId: string, updates: any) {
-    const allowed = ['fullName', 'fullNameAr', 'preferredLanguage', 'timezone', 'emailNotifications'];
+    const allowed = [
+      'fullName',
+      'fullNameAr',
+      'preferredLanguage',
+      'timezone',
+      'emailNotifications',
+    ];
     const filtered: any = {};
     for (const key of allowed) {
       if (updates[key] !== undefined) filtered[key] = updates[key];
@@ -351,7 +405,10 @@ export class AuthService {
     if (!user) return { message: 'Reset link sent if email exists' };
 
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
 
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1); // صالح ساعة واحدة
@@ -403,19 +460,31 @@ export class AuthService {
       .findOne({ tokenHash, used: false })
       .exec();
 
-    if (!resetToken) throw new BadRequestException('Invalid or expired reset token');
+    if (!resetToken)
+      throw new BadRequestException('Invalid or expired reset token');
     if (new Date(resetToken.expiresAt) < new Date()) {
       await this.resetTokenModel.deleteOne({ _id: resetToken._id });
-      throw new BadRequestException('Reset token has expired. Please request a new one.');
+      throw new BadRequestException(
+        'Reset token has expired. Please request a new one.',
+      );
     }
 
     const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await this.userModel.updateOne(
       { _id: resetToken.userId },
-      { $set: { passwordHash: newHash, mustChangePassword: false, passwordChangedAt: new Date() } },
+      {
+        $set: {
+          passwordHash: newHash,
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+        },
+      },
     );
 
-    await this.resetTokenModel.updateOne({ _id: resetToken._id }, { $set: { used: true } });
+    await this.resetTokenModel.updateOne(
+      { _id: resetToken._id },
+      { $set: { used: true } },
+    );
 
     // إلغاء جميع Refresh Tokens
     await this.refreshTokenModel.deleteMany({ userId: resetToken.userId });
@@ -430,11 +499,16 @@ export class AuthService {
       });
     } catch {}
 
-    return { message: 'Password reset successfully. Please login with your new password.' };
+    return {
+      message:
+        'Password reset successfully. Please login with your new password.',
+    };
   }
 
   // ─── Private Helpers ──────────────────────────────────────────────────────
-  private async _getPermissions(permissionIds: Types.ObjectId[]): Promise<string[]> {
+  private async _getPermissions(
+    permissionIds: Types.ObjectId[],
+  ): Promise<string[]> {
     if (!permissionIds || permissionIds.length === 0) return [];
     const perms = await this.permissionModel
       .find({ _id: { $in: permissionIds } })

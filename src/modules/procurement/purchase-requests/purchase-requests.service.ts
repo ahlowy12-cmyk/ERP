@@ -26,7 +26,8 @@ export class PurchaseRequestsService {
     session.startTransaction();
 
     try {
-      const documentNumber = await this._NumberingService.generatePRNumber(session);
+      const documentNumber =
+        await this._NumberingService.generatePRNumber(session);
       const procurementChain = 'PR';
       const chainId = documentNumber;
 

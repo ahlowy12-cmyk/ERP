@@ -12,7 +12,10 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { UserRole } from 'src/DB/enums/user.enum';
-import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/create-department.dto';
+import {
+  CreateDepartmentDto,
+  UpdateDepartmentDto,
+} from './dto/create-department.dto';
 
 @Controller('admin/departments')
 @Roles(UserRole.SuperAdmin, UserRole.GeneralManager)

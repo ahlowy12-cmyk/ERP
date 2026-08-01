@@ -49,9 +49,7 @@ import { MrvsModule } from './modules/inventory/mrvs/mrvs.module';
     }),
 
     // 2. إعدادات الـ Rate Limiting
-    ThrottlerModule.forRoot([
-      { ttl: 60000, limit: 100 },
-    ]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
 
     // 3. الاتصال بـ MongoDB
     MongooseModule.forRootAsync({

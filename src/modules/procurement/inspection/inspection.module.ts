@@ -9,12 +9,7 @@ import { PurchaseOrdersModule } from '../purchase-orders/purchase-orders.module'
 import { MrvsModule } from 'src/modules/inventory/mrvs/mrvs.module';
 
 @Module({
-  imports: [
-    InspectionRequestModel,
-    NcrModel,
-    PurchaseOrdersModule,
-    MrvsModule,
-  ],
+  imports: [InspectionRequestModel, NcrModel, PurchaseOrdersModule, MrvsModule],
   controllers: [InspectionController],
   providers: [InspectionService, InspectionRequestsRepository, NcrsRepository],
   exports: [InspectionService, InspectionRequestsRepository],

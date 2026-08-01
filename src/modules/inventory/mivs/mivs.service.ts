@@ -123,8 +123,14 @@ export class MivsService {
 
     let warehouseId: Types.ObjectId;
     try {
-      const warehouse = await this.connection.model('Warehouse').findOne({ isDeleted: false }).session(session).exec();
-      warehouseId = warehouse ? (warehouse._id as Types.ObjectId) : new Types.ObjectId();
+      const warehouse = await this.connection
+        .model('Warehouse')
+        .findOne({ isDeleted: false })
+        .session(session)
+        .exec();
+      warehouseId = warehouse
+        ? (warehouse._id as Types.ObjectId)
+        : new Types.ObjectId();
     } catch {
       warehouseId = new Types.ObjectId();
     }
@@ -133,7 +139,11 @@ export class MivsService {
     for (const item of mivItemsToCreate) {
       let itemId: Types.ObjectId | undefined;
       try {
-        const dbItem = await this.connection.model('InventoryItem').findOne({ itemCode: item.itemCode }).session(session).exec();
+        const dbItem = await this.connection
+          .model('InventoryItem')
+          .findOne({ itemCode: item.itemCode })
+          .session(session)
+          .exec();
         if (dbItem) itemId = dbItem._id as Types.ObjectId;
       } catch {}
 
@@ -151,8 +161,14 @@ export class MivsService {
       if (Types.ObjectId.isValid(purchaseRequest.requestedBy)) {
         requestedById = new Types.ObjectId(purchaseRequest.requestedBy);
       } else {
-        const user = await this.connection.model('User').findOne().session(session).exec();
-        requestedById = user ? (user._id as Types.ObjectId) : new Types.ObjectId();
+        const user = await this.connection
+          .model('User')
+          .findOne()
+          .session(session)
+          .exec();
+        requestedById = user
+          ? (user._id as Types.ObjectId)
+          : new Types.ObjectId();
       }
     } catch {
       requestedById = new Types.ObjectId();

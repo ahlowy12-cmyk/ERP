@@ -1,4 +1,10 @@
-import { IsMongoId, IsNotEmpty, IsString, IsIn, IsOptional } from 'class-validator';
+import {
+  IsMongoId,
+  IsNotEmpty,
+  IsString,
+  IsIn,
+  IsOptional,
+} from 'class-validator';
 
 export class UpdateUserRoleDto {
   @IsMongoId()

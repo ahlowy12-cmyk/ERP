@@ -122,7 +122,7 @@ export class InspectionService {
       );
 
       // ربط الـ NCR بالفحص
-      inspection.ncrId = ncr._id as any;
+      inspection.ncrId = ncr._id;
       await inspection.save({ session });
 
       await session.commitTransaction();

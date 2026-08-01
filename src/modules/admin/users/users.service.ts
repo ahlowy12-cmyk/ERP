@@ -18,7 +18,10 @@ import { RefreshTokenModelName } from './entities/refresh-token.model';
 import { AuditLogService } from 'src/shared/audit-logs/audit-logs.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UpdateUserRoleDto, UpdateUserStatusDto } from './dto/update-user-role.dto';
+import {
+  UpdateUserRoleDto,
+  UpdateUserStatusDto,
+} from './dto/update-user-role.dto';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -44,7 +47,14 @@ export class UsersService {
     departmentId?: string;
     status?: string;
   }) {
-    const { page = 1, limit = 20, search, roleId, departmentId, status } = query;
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      roleId,
+      departmentId,
+      status,
+    } = query;
     const filter: any = {};
 
     if (search) {
@@ -61,8 +71,16 @@ export class UsersService {
     const [data, total] = await Promise.all([
       this.userModel
         .find(filter)
-        .populate({ path: 'roleId', model: RoleModelName, select: 'name nameAr' })
-        .populate({ path: 'departmentId', model: 'Department', select: 'code nameEn nameAr' })
+        .populate({
+          path: 'roleId',
+          model: RoleModelName,
+          select: 'name nameAr',
+        })
+        .populate({
+          path: 'departmentId',
+          model: 'Department',
+          select: 'code nameEn nameAr',
+        })
         .select('-passwordHash -failedLoginAttempts -lockedUntil')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
@@ -111,7 +129,9 @@ export class UsersService {
     const user = await this.userModel.create({
       ...dto,
       roleId: new Types.ObjectId(dto.roleId),
-      departmentId: dto.departmentId ? new Types.ObjectId(dto.departmentId) : undefined,
+      departmentId: dto.departmentId
+        ? new Types.ObjectId(dto.departmentId)
+        : undefined,
       passwordHash,
       mustChangePassword: true,
       createdBy: new Types.ObjectId(createdBy),
@@ -128,7 +148,7 @@ export class UsersService {
           username: dto.username,
           email: dto.email,
           temporaryPassword: tempPassword,
-          role: (role as any).name,
+          role: role.name,
           loginUrl: `${this.configService.get('FRONTEND_URL') || 'http://localhost:3001'}/login`,
         },
       });
@@ -141,7 +161,7 @@ export class UsersService {
       action: 'CREATE_USER',
       entity: 'User',
       entityId: user._id.toString(),
-      details: `Created user ${dto.username} with role ${(role as any).name}`,
+      details: `Created user ${dto.username} with role ${role.name}`,
     });
 
     const { passwordHash: _, ...result } = user.toObject();
@@ -150,11 +170,11 @@ export class UsersService {
 
   // ─── Update User ──────────────────────────────────────────────────────────
   async update(id: string, dto: UpdateUserDto, updatedBy: string) {
-    const user = await this.userModel.findByIdAndUpdate(
-      id,
-      { $set: dto },
-      { new: true },
-    ).select('-passwordHash').lean().exec();
+    const user = await this.userModel
+      .findByIdAndUpdate(id, { $set: dto }, { new: true })
+      .select('-passwordHash')
+      .lean()
+      .exec();
 
     if (!user) throw new NotFoundException('User not found');
 
@@ -174,11 +194,15 @@ export class UsersService {
     const role = await this.roleModel.findById(dto.roleId).lean().exec();
     if (!role) throw new NotFoundException('Role not found');
 
-    const user = await this.userModel.findByIdAndUpdate(
-      id,
-      { $set: { roleId: new Types.ObjectId(dto.roleId) } },
-      { new: true },
-    ).select('-passwordHash').lean().exec();
+    const user = await this.userModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { roleId: new Types.ObjectId(dto.roleId) } },
+        { new: true },
+      )
+      .select('-passwordHash')
+      .lean()
+      .exec();
 
     if (!user) throw new NotFoundException('User not found');
 
@@ -190,24 +214,29 @@ export class UsersService {
       action: 'UPDATE_USER_ROLE',
       entity: 'User',
       entityId: id,
-      details: `Changed role to ${(role as any).name}`,
+      details: `Changed role to ${role.name}`,
     });
 
-    return { message: 'Role updated. User must re-login to get new permissions.', user };
+    return {
+      message: 'Role updated. User must re-login to get new permissions.',
+      user,
+    };
   }
 
   // ─── Update Status ────────────────────────────────────────────────────────
   async updateStatus(id: string, dto: UpdateUserStatusDto, updatedBy: string) {
-    const user = await this.userModel.findByIdAndUpdate(
-      id,
-      { $set: { status: dto.status } },
-      { new: true },
-    ).select('-passwordHash').lean().exec();
+    const user = await this.userModel
+      .findByIdAndUpdate(id, { $set: { status: dto.status } }, { new: true })
+      .select('-passwordHash')
+      .lean()
+      .exec();
 
     if (!user) throw new NotFoundException('User not found');
 
     if (dto.status !== 'Active') {
-      await this.refreshTokenModel.deleteMany({ userId: new Types.ObjectId(id) });
+      await this.refreshTokenModel.deleteMany({
+        userId: new Types.ObjectId(id),
+      });
     }
 
     await this.auditLogService.log({
@@ -225,7 +254,8 @@ export class UsersService {
   async deactivate(id: string, deletedBy: string) {
     const user = await this.userModel
       .findByIdAndUpdate(id, { $set: { status: 'Inactive' } }, { new: true })
-      .lean().exec();
+      .lean()
+      .exec();
 
     if (!user) throw new NotFoundException('User not found');
 
@@ -259,13 +289,13 @@ export class UsersService {
 
     try {
       await this.mailerService.sendMail({
-        to: (user as any).email,
+        to: user.email,
         subject: 'PetroFlow ERP — Your Password Has Been Reset',
         template: 'welcome-user',
         context: {
-          fullName: (user as any).fullName,
-          username: (user as any).username,
-          email: (user as any).email,
+          fullName: user.fullName,
+          username: user.username,
+          email: user.email,
           temporaryPassword: tempPassword,
           role: '',
           loginUrl: `${this.configService.get('FRONTEND_URL') || 'http://localhost:3001'}/login`,
@@ -300,6 +330,9 @@ export class UsersService {
     for (let i = 4; i < 12; i++) {
       pass += all[Math.floor(Math.random() * all.length)];
     }
-    return pass.split('').sort(() => Math.random() - 0.5).join('');
+    return pass
+      .split('')
+      .sort(() => Math.random() - 0.5)
+      .join('');
   }
 }

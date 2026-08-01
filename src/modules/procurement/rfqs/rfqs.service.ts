@@ -40,7 +40,10 @@ export class RfqsService {
       const prSeq = prParts[2];
 
       // 3. توليد رقم الـ RFQ الهرمي
-      const documentNumber = await this._NumberingService.generateRFQNumber(pr.requestNumber!, session);
+      const documentNumber = await this._NumberingService.generateRFQNumber(
+        pr.requestNumber!,
+        session,
+      );
       const docParts = documentNumber.split('-');
       const rfqSeq = docParts[docParts.length - 1];
 

@@ -3,7 +3,8 @@ import { HydratedDocument, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class RefreshToken {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true }) userId!: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  userId!: Types.ObjectId;
   @Prop({ type: String, required: true }) tokenHash!: string;
   @Prop({ type: String }) deviceInfo?: string;
   @Prop({ type: String }) ipAddress?: string;
