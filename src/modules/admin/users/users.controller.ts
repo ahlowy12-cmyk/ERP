@@ -48,6 +48,12 @@ export class UsersController {
     });
   }
 
+  // TASK 1 — GET /admin/users/stats (يجب أن يكون قبل :id لتجنب التعارض)
+  @Get('stats')
+  getStats() {
+    return this.usersService.getStats();
+  }
+
   // GET /admin/users/:id
   @Get(':id')
   findOne(@Param('id') id: string) {

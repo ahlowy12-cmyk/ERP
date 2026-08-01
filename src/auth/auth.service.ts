@@ -179,6 +179,7 @@ export class AuthService {
         preferredLanguage: user.preferredLanguage,
         timezone: user.timezone,
         lastLogin: user.lastLogin,
+        mustChangePassword: user.mustChangePassword ?? false, // TASK 5
       },
     };
   }

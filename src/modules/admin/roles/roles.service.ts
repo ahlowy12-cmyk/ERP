@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { RoleModelName } from './entities/role.model';
 import { PermissionModelName } from './entities/permission.model';
+import { UserModelName } from '../users/entities/user.model';
 import { AuditLogService } from 'src/shared/audit-logs/audit-logs.service';
 import { CreateRoleDto, UpdateRoleDto } from './dto/create-role.dto';
 
@@ -19,12 +20,13 @@ export class RolesService {
   constructor(
     @InjectModel(RoleModelName) private roleModel: Model<any>,
     @InjectModel(PermissionModelName) private permissionModel: Model<any>,
+    @InjectModel(UserModelName) private userModel: Model<any>,
     private auditLogService: AuditLogService,
   ) {}
 
-  // ─── Get All Roles ────────────────────────────────────────────────────────
+  // ─── Get All Roles (TASK 4: with usersCount) ──────────────────────────────
   async findAll() {
-    return this.roleModel
+    const roles = await this.roleModel
       .find()
       .populate({
         path: 'permissions',
@@ -33,6 +35,21 @@ export class RolesService {
       })
       .lean()
       .exec();
+
+    // TASK 4: تجميع عدد المستخدمين لكل دور باستخدام aggregation واحدة
+    const counts: { _id: string; count: number }[] =
+      await this.userModel.aggregate([
+        { $match: {} },
+        { $group: { _id: '$roleId', count: { $sum: 1 } } },
+      ]);
+    const countMap = Object.fromEntries(
+      counts.map((c) => [c._id?.toString(), c.count]),
+    );
+
+    return roles.map((role: any) => ({
+      ...role,
+      usersCount: countMap[role._id?.toString()] ?? 0,
+    }));
   }
 
   // ─── Get One Role ─────────────────────────────────────────────────────────
@@ -44,6 +61,27 @@ export class RolesService {
       .exec();
     if (!role) throw new NotFoundException('Role not found');
     return role;
+  }
+
+  // ─── TASK 2: Get Users by Role ───────────────────────────────────────────
+  async getUsersByRole(roleId: string) {
+    // التحقق من وجود الدور أولاً
+    const role = await this.roleModel.findById(roleId).lean().exec();
+    if (!role) throw new NotFoundException('Role not found');
+
+    return this.userModel
+      .find({ roleId: new Types.ObjectId(roleId) })
+      .populate({
+        path: 'departmentId',
+        model: 'Department',
+        select: 'nameAr nameEn code',
+      })
+      .select(
+        'username fullName fullNameAr email avatar status departmentId lastLogin',
+      )
+      .sort({ fullName: 1 })
+      .lean()
+      .exec();
   }
 
   // ─── Create Role ──────────────────────────────────────────────────────────

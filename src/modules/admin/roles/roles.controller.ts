@@ -38,6 +38,12 @@ export class RolesController {
     return this.rolesService.findOne(id);
   }
 
+  // TASK 2 — GET /admin/roles/:id/users
+  @Get(':id/users')
+  getUsersByRole(@Param('id') id: string) {
+    return this.rolesService.getUsersByRole(id);
+  }
+
   // POST /admin/roles
   @Post()
   create(@Body() dto: CreateRoleDto, @CurrentUser('id') adminId: string) {

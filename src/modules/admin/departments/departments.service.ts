@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { DepartmentModelName } from './entities/department.model';
+import { UserModelName } from '../users/entities/user.model';
 import { AuditLogService } from 'src/shared/audit-logs/audit-logs.service';
 import {
   CreateDepartmentDto,
@@ -16,11 +18,13 @@ import {
 export class DepartmentsService {
   constructor(
     @InjectModel(DepartmentModelName) private departmentModel: Model<any>,
+    @InjectModel(UserModelName) private userModel: Model<any>,
     private auditLogService: AuditLogService,
   ) {}
 
+  // TASK 3: findAll مع usersCount لكل قسم
   async findAll() {
-    return this.departmentModel
+    const departments = await this.departmentModel
       .find()
       .populate({
         path: 'managerId',
@@ -34,6 +38,26 @@ export class DepartmentsService {
       })
       .lean()
       .exec();
+
+    // تجميع عدد المستخدمين لكل قسم باستخدام aggregation واحدة
+    const counts: { _id: string; count: number }[] =
+      await this.userModel.aggregate([
+        { $match: { status: { $ne: 'Inactive' } } },
+        {
+          $group: {
+            _id: '$departmentId',
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+    const countMap = Object.fromEntries(
+      counts.map((c) => [c._id?.toString(), c.count]),
+    );
+
+    return departments.map((dept: any) => ({
+      ...dept,
+      usersCount: countMap[dept._id?.toString()] ?? 0,
+    }));
   }
 
   async findOne(id: string) {
@@ -112,9 +136,25 @@ export class DepartmentsService {
     return dept;
   }
 
+  // TASK 7: منع حذف قسم فيه موظفون نشطون
   async remove(id: string, deletedBy: string) {
-    const dept = await this.departmentModel.findByIdAndDelete(id).lean().exec();
+    const dept = await this.departmentModel.findById(id).lean().exec();
     if (!dept) throw new NotFoundException('Department not found');
+
+    const usersCount = await this.userModel.countDocuments({
+      departmentId: new Types.ObjectId(id),
+      status: { $ne: 'Inactive' },
+    });
+
+    if (usersCount > 0) {
+      throw new BadRequestException({
+        message:
+          'Cannot delete department with active users. Reassign users first.',
+        data: { usersCount },
+      });
+    }
+
+    await this.departmentModel.findByIdAndDelete(id);
 
     await this.auditLogService.log({
       userId: deletedBy,
@@ -127,3 +167,4 @@ export class DepartmentsService {
     return { message: 'Department deleted successfully' };
   }
 }
+

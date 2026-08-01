@@ -74,6 +74,10 @@ export class User {
   @Prop({ type: Date })
   lockedUntil?: Date;
 
+  // TASK 8: تاريخ انتهاء التعليق التلقائي
+  @Prop({ type: Date })
+  suspendUntil?: Date;
+
   @Prop({ type: Boolean, default: false })
   mustChangePassword!: boolean;
 

@@ -16,6 +16,7 @@ try {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.setGlobalPrefix('api/v1');
 
   // 1. تفعيل Helmet لحماية الـ HTTP Headers من ثغرات الويب المعروفة
   app.use(helmet());

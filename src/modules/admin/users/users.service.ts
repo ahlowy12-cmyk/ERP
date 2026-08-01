@@ -225,8 +225,22 @@ export class UsersService {
 
   // ─── Update Status ────────────────────────────────────────────────────────
   async updateStatus(id: string, dto: UpdateUserStatusDto, updatedBy: string) {
+    // TASK 6: منع تعطيل آخر Super Admin
+    if (dto.status !== 'Active') {
+      await this.guardLastSuperAdmin(id);
+    }
+
+    // TASK 8: بناء كائن التحديث مع دعم suspendUntil
+    const updateFields: any = { status: dto.status };
+    if (dto.status === 'Suspended' && dto.suspendUntil) {
+      updateFields.suspendUntil = dto.suspendUntil;
+    } else if (dto.status === 'Active') {
+      // مسح suspendUntil تلقائياً عند إعادة التفعيل
+      updateFields.suspendUntil = null;
+    }
+
     const user = await this.userModel
-      .findByIdAndUpdate(id, { $set: { status: dto.status } }, { new: true })
+      .findByIdAndUpdate(id, { $set: updateFields }, { new: true })
       .select('-passwordHash')
       .lean()
       .exec();
@@ -252,6 +266,9 @@ export class UsersService {
 
   // ─── Delete (Soft: Deactivate) ─────────────────────────────────────────────
   async deactivate(id: string, deletedBy: string) {
+    // TASK 6: منع تعطيل آخر Super Admin
+    await this.guardLastSuperAdmin(id);
+
     const user = await this.userModel
       .findByIdAndUpdate(id, { $set: { status: 'Inactive' } }, { new: true })
       .lean()
@@ -314,6 +331,52 @@ export class UsersService {
     });
 
     return { message: 'Password reset and sent to user email' };
+  }
+
+  // ─── TASK 1: إحصائيات المستخدمين ─────────────────────────────────────────
+  async getStats() {
+    const [total, active, inactive, suspended, pending] = await Promise.all([
+      this.userModel.countDocuments(),
+      this.userModel.countDocuments({ status: 'Active' }),
+      this.userModel.countDocuments({ status: 'Inactive' }),
+      this.userModel.countDocuments({ status: 'Suspended' }),
+      this.userModel.countDocuments({ status: 'Pending' }),
+    ]);
+    return { data: { total, active, inactive, suspended, pending } };
+  }
+
+  // ─── TASK 6: Guard آخر Super Admin ────────────────────────────────────────
+  private async guardLastSuperAdmin(userId: string): Promise<void> {
+    // جلب الدور المرتبط بالمستخدم المستهدف
+    const user = await this.userModel
+      .findById(userId)
+      .populate({ path: 'roleId', model: RoleModelName, select: 'name' })
+      .lean()
+      .exec();
+
+    if (!user) return; // إذا لم يُوجد فسيُعطي NotFound لاحقاً
+
+    const isTargetSuperAdmin = (user.roleId as any)?.name === 'Super Admin';
+    if (!isTargetSuperAdmin) return; // ليس Super Admin — لا مشكلة
+
+    // جلب الدور بالـ id لاستخدامه في الفلتر
+    const superAdminRole = await this.roleModel
+      .findOne({ name: 'Super Admin' })
+      .lean()
+      .exec();
+    if (!superAdminRole) return;
+
+    const activeCount = await this.userModel.countDocuments({
+      roleId: superAdminRole._id,
+      status: 'Active',
+      _id: { $ne: new Types.ObjectId(userId) },
+    });
+
+    if (activeCount === 0) {
+      throw new BadRequestException(
+        'Cannot deactivate the last Super Admin account',
+      );
+    }
   }
 
   private _generateTempPassword(): string {
