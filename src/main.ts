@@ -28,7 +28,7 @@ async function bootstrap() {
   //   credentials: true,
   // });
 
-  // 3. تفعيل جدار الحماية للبيانات (Validation Pipe) عالمياً باستخدام الـ DTOs
+  //3. تفعيل جدار الحماية للبيانات (Validation Pipe) عالمياً باستخدام الـ DTOs
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // يزيل أي حقول غير مسجلة في الـ DTO
