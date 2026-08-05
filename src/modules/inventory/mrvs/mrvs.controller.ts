@@ -15,7 +15,7 @@ import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
-@Controller('api/v1/inventory/mrvs')
+@Controller('inventory/mrvs')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MrvsController {
   constructor(private readonly mrvsService: MrvsService) {}

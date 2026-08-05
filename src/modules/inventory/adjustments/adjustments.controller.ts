@@ -15,7 +15,7 @@ import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
-@Controller('api/v1/inventory/adjustments')
+@Controller('inventory/adjustments')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AdjustmentsController {
   constructor(private readonly adjustmentsService: AdjustmentsService) {}

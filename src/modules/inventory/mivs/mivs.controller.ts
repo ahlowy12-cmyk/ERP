@@ -15,7 +15,7 @@ import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
-@Controller('api/v1/inventory/mivs')
+@Controller('inventory/mivs')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MivsController {
   constructor(private readonly mivsService: MivsService) {}

@@ -26,6 +26,24 @@ import { PurchaseRequestsModule } from './modules/procurement/purchase-requests/
 import { PurchaseOrdersModule } from './modules/procurement/purchase-orders/purchase-orders.module';
 import { MrvsModule } from './modules/inventory/mrvs/mrvs.module';
 
+// 🏗️ Phase 1 — Master Data & Contracts
+import { EquipmentModule } from './modules/assets/equipment/equipment.module';
+import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { ContractsModule } from './modules/workflow/contracts/contracts.module';
+
+// ⚡ Phase 2 — Field Operations, Fuel, Fleet, Camps
+import { ProjectResourcesModule } from './modules/projects/project-resources.module';
+import { TimesheetsModule } from './modules/operations/timesheets/timesheets.module';
+import { FuelModule } from './modules/operations/fuel/fuel.module';
+import { FleetModule } from './modules/operations/fleet/fleet.module';
+import { CampsModule } from './modules/operations/camps/camps.module';
+
+// 💳 Phase 3 — Billing, Invoicing & Collections
+import { DARModule } from './modules/billing/dar/dar.module';
+import { WCCModule } from './modules/billing/wcc/wcc.module';
+import { InvoicesModule } from './modules/billing/invoices/invoices.module';
+
 @Module({
   imports: [
     // 1. إعدادات متغيرات البيئة
@@ -77,6 +95,24 @@ import { MrvsModule } from './modules/inventory/mrvs/mrvs.module';
     PurchaseRequestsModule,
     PurchaseOrdersModule,
     MrvsModule,
+
+    // 8. Phase 1 — Master Assets, Contracts, Projects, Cost Centers
+    EquipmentModule,
+    CostCentersModule,
+    ProjectsModule,
+    ContractsModule,
+
+    // 9. Phase 2 — Field Operations, Fuel, Fleet, Camps
+    ProjectResourcesModule,
+    TimesheetsModule,
+    FuelModule,
+    FleetModule,
+    CampsModule,
+
+    // 10. Phase 3 — Billing, Invoicing & Collections
+    DARModule,
+    WCCModule,
+    InvoicesModule,
   ],
 
   providers: [
