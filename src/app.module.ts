@@ -28,9 +28,13 @@ import { MrvsModule } from './modules/inventory/mrvs/mrvs.module';
 
 // 🏗️ Phase 1 — Master Data & Contracts
 import { EquipmentModule } from './modules/assets/equipment/equipment.module';
+import { AssetsModule } from './modules/assets/assets.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ContractsModule } from './modules/workflow/contracts/contracts.module';
+
+// 🔧 Maintenance
+import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 
 // ⚡ Phase 2 — Field Operations, Fuel, Fleet, Camps
 import { ProjectResourcesModule } from './modules/projects/project-resources.module';
@@ -43,6 +47,9 @@ import { CampsModule } from './modules/operations/camps/camps.module';
 import { DARModule } from './modules/billing/dar/dar.module';
 import { WCCModule } from './modules/billing/wcc/wcc.module';
 import { InvoicesModule } from './modules/billing/invoices/invoices.module';
+
+// 💰 Finance Module
+import { FinanceModule } from './modules/finance/finance.module';
 
 @Module({
   imports: [
@@ -98,9 +105,13 @@ import { InvoicesModule } from './modules/billing/invoices/invoices.module';
 
     // 8. Phase 1 — Master Assets, Contracts, Projects, Cost Centers
     EquipmentModule,
+    AssetsModule,
     CostCentersModule,
     ProjectsModule,
     ContractsModule,
+
+    // 8b. Maintenance
+    MaintenanceModule,
 
     // 9. Phase 2 — Field Operations, Fuel, Fleet, Camps
     ProjectResourcesModule,
@@ -113,6 +124,9 @@ import { InvoicesModule } from './modules/billing/invoices/invoices.module';
     DARModule,
     WCCModule,
     InvoicesModule,
+
+    // 11. Finance Module (COA, GL, AP, AR, Cash & Bank, Budget, Depreciation, VAT, Statements)
+    FinanceModule,
   ],
 
   providers: [

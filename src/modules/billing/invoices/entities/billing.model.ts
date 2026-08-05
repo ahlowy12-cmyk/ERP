@@ -21,7 +21,11 @@ export class JournalEntry extends Document {
 
   @Prop({
     type: String,
-    enum: ['Invoice', 'Collection', 'Manual', 'Adjustment'],
+    enum: [
+      'Invoice', 'Collection', 'Manual', 'Adjustment',
+      'AP_Invoice', 'AP_Payment', 'AR_Collection',
+      'Depreciation', 'VAT_Settlement',
+    ],
     required: true,
   })
   sourceType!: string;
@@ -59,7 +63,7 @@ export class JournalEntry extends Document {
 
   @Prop({
     type: String,
-    enum: ['Draft', 'Posted'],
+    enum: ['Draft', 'Posted', 'Voided'],
     default: 'Posted',
   })
   status!: string;

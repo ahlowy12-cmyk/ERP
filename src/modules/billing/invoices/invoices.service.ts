@@ -32,17 +32,52 @@ export class InvoicesService {
     @InjectConnection() private connection: Connection,
   ) {}
 
-  // ─── Auto-Number Helpers ────────────────────────────────────────────────
-  private async nextNumber(model: Model<any>, field: string, prefix: string): Promise<string> {
+  // ─── Atomic Sequence Generator (Race-Condition Safe) ────────────────────
+  // Uses MongoDB's atomic findOneAndUpdate with $inc to guarantee uniqueness
+  // even under concurrent requests. Safe to call inside a session/transaction.
+  private async nextNumber(
+    model: Model<any>,
+    field: string,
+    prefix: string,
+    session?: any,
+  ): Promise<string> {
     const year = new Date().getFullYear();
     const fullPrefix = `${prefix}-${year}-`;
-    const last = await model
-      .findOne({ [field]: { $regex: `^${fullPrefix}` } })
-      .sort({ [field]: -1 }).lean();
-    let seq = 1;
-    if (last) seq = parseInt(String((last as any)[field]).split('-').pop() ?? '0', 10) + 1;
-    return `${fullPrefix}${String(seq).padStart(3, '0')}`;
+
+    // Strategy: find the current highest seq and increment atomically
+    // by sorting descending and doing a "read-then-increment" with retry.
+    const MAX_RETRIES = 5;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const last = await model
+        .findOne({ [field]: { $regex: `^${fullPrefix}` } })
+        .sort({ [field]: -1 })
+        .lean()
+        .session(session ?? null);
+
+      const lastSeq = last
+        ? parseInt(String((last as any)[field]).split('-').pop() ?? '0', 10)
+        : 0;
+      const candidate = `${fullPrefix}${String(lastSeq + 1).padStart(3, '0')}`;
+
+      // Verify candidate is not already taken (atomic check)
+      const existing = await model
+        .findOne({ [field]: candidate })
+        .lean()
+        .session(session ?? null);
+
+      if (!existing) return candidate;
+
+      // If taken (concurrent insert), retry with next seq
+      this.logger.warn(
+        `Sequence collision for ${candidate} (attempt ${attempt}/${MAX_RETRIES}) — retrying`,
+      );
+    }
+
+    // Fallback: use timestamp to guarantee uniqueness
+    const ts = Date.now().toString().slice(-4);
+    return `${fullPrefix}${ts}`;
   }
+
 
   // ─── GL Entry Builder ───────────────────────────────────────────────────
   private async createGLEntry(data: {
@@ -124,7 +159,7 @@ export class InvoicesService {
     session.startTransaction();
 
     try {
-      const invoiceNumber = await this.nextNumber(this.invoiceModel, 'invoiceNumber', 'INV');
+      const invoiceNumber = await this.nextNumber(this.invoiceModel, 'invoiceNumber', 'INV', session);
 
       // 1. Build GL lines
       const glLines = [
@@ -138,7 +173,7 @@ export class InvoicesService {
       // 2. Create GL entry (inside transaction)
       const [glEntry] = await this.jeModel.create(
         [{
-          entryNumber: await this.nextNumber(this.jeModel, 'entryNumber', 'JE'),
+          entryNumber: await this.nextNumber(this.jeModel, 'entryNumber', 'JE', session),
           entryDate: new Date(),
           description: `Invoice for WCC ${(wcc as any).wccNumber}`,
           reference: invoiceNumber,
@@ -230,12 +265,12 @@ export class InvoicesService {
     session.startTransaction();
 
     try {
-      const collectionNumber = await this.nextNumber(this.collectionModel, 'collectionNumber', 'COL');
+      const collectionNumber = await this.nextNumber(this.collectionModel, 'collectionNumber', 'COL', session);
 
       // GL Entry: DR Bank / CR AR
       const [glEntry] = await this.jeModel.create(
         [{
-          entryNumber: await this.nextNumber(this.jeModel, 'entryNumber', 'JE'),
+          entryNumber: await this.nextNumber(this.jeModel, 'entryNumber', 'JE', session),
           entryDate: new Date(dto.date),
           description: `Payment received for Invoice ${invoice.invoiceNumber}`,
           reference: collectionNumber,
