@@ -45,7 +45,7 @@ export class Camp extends Document {
 }
 
 export const CampSchema = SchemaFactory.createForClass(Camp);
-CampSchema.index({ campCode: 1 }, { unique: true });
+// Note: campCode is unique via @Prop({ unique: true })
 CampSchema.index({ projectCode: 1 });
 CampSchema.index({ status: 1 });
 

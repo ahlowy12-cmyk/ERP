@@ -65,8 +65,7 @@ export class Vehicle extends Document {
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);
-VehicleSchema.index({ vehicleCode: 1 }, { unique: true });
-VehicleSchema.index({ plateNumber: 1 }, { unique: true });
+// Note: vehicleCode and plateNumber are unique via @Prop({ unique: true })
 VehicleSchema.index({ status: 1 });
 VehicleSchema.index({ currentProjectCode: 1 });
 

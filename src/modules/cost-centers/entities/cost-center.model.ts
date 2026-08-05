@@ -50,7 +50,7 @@ export class CostCenter extends Document {
 export const CostCenterSchema = SchemaFactory.createForClass(CostCenter);
 
 // Index for fast lookup
-CostCenterSchema.index({ code: 1 }, { unique: true });
+// Note: code is unique via @Prop({ unique: true })
 CostCenterSchema.index({ type: 1 });
 CostCenterSchema.index({ isActive: 1 });
 

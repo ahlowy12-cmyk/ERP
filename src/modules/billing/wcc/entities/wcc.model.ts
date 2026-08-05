@@ -112,7 +112,7 @@ export class WCC extends Document {
 }
 
 export const WCCSchema = SchemaFactory.createForClass(WCC);
-WCCSchema.index({ wccNumber: 1 }, { unique: true });
+// Note: wccNumber is unique via @Prop({ unique: true })
 WCCSchema.index({ contractId: 1 });
 WCCSchema.index({ status: 1 });
 

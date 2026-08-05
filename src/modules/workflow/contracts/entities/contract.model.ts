@@ -168,7 +168,7 @@ export class Contract extends Document {
 }
 
 export const ContractSchema = SchemaFactory.createForClass(Contract);
-ContractSchema.index({ contractNumber: 1 }, { unique: true });
+// Note: contractNumber is unique via @Prop({ unique: true })
 ContractSchema.index({ status: 1 });
 ContractSchema.index({ clientName: 1 });
 

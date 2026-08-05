@@ -69,7 +69,7 @@ export class JournalEntry extends Document {
 }
 
 export const JournalEntrySchema = SchemaFactory.createForClass(JournalEntry);
-JournalEntrySchema.index({ entryNumber: 1 }, { unique: true });
+// Note: entryNumber is unique via @Prop({ unique: true })
 JournalEntrySchema.index({ sourceType: 1, sourceId: 1 });
 JournalEntrySchema.index({ entryDate: -1 });
 
@@ -166,7 +166,7 @@ export class SalesInvoice extends Document {
 }
 
 export const SalesInvoiceSchema = SchemaFactory.createForClass(SalesInvoice);
-SalesInvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
+// Note: invoiceNumber is unique via @Prop({ unique: true })
 SalesInvoiceSchema.index({ contractId: 1 });
 SalesInvoiceSchema.index({ status: 1 });
 SalesInvoiceSchema.index({ dueDate: 1 });
@@ -234,7 +234,7 @@ export class Collection extends Document {
 }
 
 export const CollectionSchema = SchemaFactory.createForClass(Collection);
-CollectionSchema.index({ collectionNumber: 1 }, { unique: true });
+// Note: collectionNumber is unique via @Prop({ unique: true })
 CollectionSchema.index({ invoiceId: 1 });
 CollectionSchema.index({ date: -1 });
 

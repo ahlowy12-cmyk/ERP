@@ -51,7 +51,7 @@ export class FuelTank extends Document {
 }
 
 export const FuelTankSchema = SchemaFactory.createForClass(FuelTank);
-FuelTankSchema.index({ tankCode: 1 }, { unique: true });
+// Note: tankCode is unique via @Prop({ unique: true })
 FuelTankSchema.index({ projectCode: 1 });
 FuelTankSchema.index({ status: 1 });
 

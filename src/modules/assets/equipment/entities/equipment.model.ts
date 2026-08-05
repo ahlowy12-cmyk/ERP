@@ -95,9 +95,8 @@ export class Equipment extends Document {
 
 export const EquipmentSchema = SchemaFactory.createForClass(Equipment);
 
-EquipmentSchema.index({ equipmentCode: 1 }, { unique: true });
-EquipmentSchema.index({ assetNumber: 1 }, { unique: true });
-EquipmentSchema.index({ serialNumber: 1 }, { unique: true });
+// Note: equipmentCode, assetNumber, serialNumber are unique via @Prop({ unique: true })
+// Only add non-unique secondary indices here
 EquipmentSchema.index({ status: 1 });
 EquipmentSchema.index({ category: 1 });
 EquipmentSchema.index({ projectAssignment: 1 });

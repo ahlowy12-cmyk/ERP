@@ -125,7 +125,7 @@ export class Project extends Document {
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);
 
-ProjectSchema.index({ code: 1 }, { unique: true });
+// Note: code is unique via @Prop({ unique: true })
 ProjectSchema.index({ contractNumber: 1 });
 ProjectSchema.index({ status: 1 });
 ProjectSchema.index({ customer: 1 });
