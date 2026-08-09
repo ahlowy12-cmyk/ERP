@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, Types } from 'mongoose';
+import { Model, Connection } from 'mongoose';
 import { SupplierInvoiceModelName, PaymentVoucherModelName } from '../entities/ap.model';
 import { JournalEntryModelName } from '../../billing/invoices/entities/billing.model';
 import { BankAccountModelName, CashAccountModelName } from '../entities/cash-bank.model';
@@ -32,49 +32,71 @@ export class ApService {
     throw new BadRequestException(`Could not generate next number for ${prefix}`);
   }
 
-  async findAllInvoices(query: { status?: string; vendorId?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) {
+  private async nextJENumber(session?: any): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `JE-${year}-`;
+    for (let i = 0; i < 5; i++) {
+      const last = await this.journalEntryModel.findOne(
+        { journalNumber: { $regex: `^${prefix}` } },
+        {},
+        { sort: { journalNumber: -1 }, session }
+      );
+      let nextNum = 1;
+      if (last?.journalNumber) {
+        const parts = last.journalNumber.split('-');
+        if (parts.length === 3) nextNum = parseInt(parts[2], 10) + 1;
+      }
+      const journalNumber = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+      const exists = await this.journalEntryModel.exists({ journalNumber }).session?.(session);
+      if (!exists) return journalNumber;
+    }
+    throw new Error('Could not generate unique JE number');
+  }
+
+  // ─── AP Invoices ──────────────────────────────────────────────────────────
+
+  async findAllInvoices(query: {
+    status?: string; vendorId?: string; search?: string;
+    dateFrom?: string; dateTo?: string; page?: number; limit?: number;
+  }) {
     const filter: any = {};
     if (query.status) filter.status = query.status;
     if (query.vendorId) filter.vendorId = query.vendorId;
     if (query.search) {
       filter.$or = [
         { invoiceNumber: { $regex: query.search, $options: 'i' } },
-        { vendorName: { $regex: query.search, $options: 'i' } }
+        { vendorName:    { $regex: query.search, $options: 'i' } },
+        { poNumber:      { $regex: query.search, $options: 'i' } },
       ];
     }
     if (query.dateFrom || query.dateTo) {
       filter.invoiceDate = {};
       if (query.dateFrom) filter.invoiceDate.$gte = new Date(query.dateFrom);
-      if (query.dateTo) filter.invoiceDate.$lte = new Date(query.dateTo);
+      if (query.dateTo)   filter.invoiceDate.$lte = new Date(query.dateTo);
     }
 
-    const page = query.page ? Number(query.page) : 1;
+    const page  = query.page  ? Number(query.page)  : 1;
     const limit = query.limit ? Number(query.limit) : 10;
-    const skip = (page - 1) * limit;
+    const skip  = (page - 1) * limit;
 
     const [data, allInvoices] = await Promise.all([
-      this.supplierInvoiceModel.find(filter).skip(skip).limit(limit).exec(),
-      this.supplierInvoiceModel.find(filter).exec()
+      this.supplierInvoiceModel.find(filter).sort({ invoiceDate: -1 }).skip(skip).limit(limit).lean(),
+      this.supplierInvoiceModel.find(filter).lean(),
     ]);
 
+    const today = new Date();
     const totalOutstanding = allInvoices
       .filter(i => i.status !== 'Paid' && i.status !== 'Cancelled')
-      .reduce((sum, i) => sum + (i.balanceDue || 0), 0);
-    const totalPaid = allInvoices.reduce((sum, i) => sum + (i.paidAmount || 0), 0);
-    const today = new Date();
-    const overdueCount = allInvoices.filter(i => 
+      .reduce((s, i) => s + (i.balanceDue || 0), 0);
+    const totalPaid       = allInvoices.reduce((s, i) => s + (i.paidAmount || 0), 0);
+    const overdueCount    = allInvoices.filter(i =>
       new Date(i.dueDate) < today && (i.status === 'Unpaid' || i.status === 'Partially Paid')
     ).length;
-    const activeVendors = new Set(allInvoices.map(i => i.vendorId?.toString()).filter(Boolean));
+    const activeVendors   = new Set(allInvoices.map(i => i.vendorId?.toString()).filter(Boolean));
 
     return {
       data,
-      kpis: {
-        totalOutstanding,
-        totalPaid,
-        overdueCount,
-        activeVendorCount: activeVendors.size
-      }
+      kpis: { totalOutstanding, totalPaid, overdueCount, activeVendorCount: activeVendors.size },
     };
   }
 
@@ -82,10 +104,9 @@ export class ApService {
     const session = await this.connection.startSession();
     session.startTransaction();
     try {
-      const subTotal = dto.subTotal || 0;
-      const taxAmount = dto.taxAmount || 0;
+      const subTotal    = dto.subTotal   || 0;
+      const taxAmount   = dto.taxAmount  || 0;
       const totalAmount = subTotal + taxAmount;
-      const balanceDue = totalAmount;
 
       let invoiceNumber = dto.invoiceNumber;
       if (!invoiceNumber) {
@@ -96,100 +117,110 @@ export class ApService {
         ...dto,
         invoiceNumber,
         totalAmount,
-        balanceDue,
+        balanceDue: totalAmount,
+        paidAmount: 0,
         status: 'Unpaid',
         createdBy: userId,
       });
-
       await invoice.save({ session });
 
+      // ── Auto-post GL ────────────────────────────────────────────────────
+      // DR chargeAccount (expense)  = subTotal
+      // DR 215000 (VAT Receivable)  = taxAmount  (input VAT is an asset)
+      // CR 211000 (A/P)             = totalAmount
       const chargeAccountCode = dto.chargeAccountCode || '521000';
-      const lines = [
-        { accountCode: chargeAccountCode, debit: subTotal, credit: 0 },
-        { accountCode: '211000', debit: 0, credit: totalAmount } // A/P
+      const glLines: any[] = [
+        { accountCode: chargeAccountCode, accountName: 'Charge Account', type: 'Debit',  amount: subTotal   },
+        { accountCode: '211000',          accountName: 'Accounts Payable (A/P)',  type: 'Credit', amount: totalAmount },
       ];
-      
       if (taxAmount > 0) {
-        lines.push({ accountCode: '214000', debit: taxAmount, credit: 0 }); // VAT Payable
+        glLines.splice(1, 0,
+          { accountCode: '215000', accountName: 'VAT Receivable', type: 'Debit', amount: taxAmount }
+        );
       }
 
+      const journalNumber = await this.nextJENumber(session);
       const glEntry = new this.journalEntryModel({
-        entryDate: dto.invoiceDate || new Date(),
+        journalNumber,
+        date: dto.invoiceDate ? new Date(dto.invoiceDate) : new Date(),
         reference: invoiceNumber,
         sourceType: 'AP_Invoice',
-        description: `AP Invoice for ${dto.vendorName}`,
-        lines,
+        description: `AP Invoice — ${dto.vendorName}`,
+        status: 'Posted',
+        totalDebit:  subTotal + taxAmount,
+        totalCredit: totalAmount,
+        lines: glLines,
         createdBy: userId,
       });
-
       await glEntry.save({ session });
 
-      for (const line of lines) {
-        if (line.debit > 0) {
-          await this.coaModel.updateOne({ code: line.accountCode }, { $inc: { balance: line.debit } }, { session });
-        }
-        if (line.credit > 0) {
-          await this.coaModel.updateOne({ code: line.accountCode }, { $inc: { balance: -line.credit } }, { session });
-        }
+      // ── Update COA balances ──────────────────────────────────────────────
+      for (const line of glLines) {
+        const inc = line.type === 'Debit' ? line.amount : -line.amount;
+        await this.coaModel.updateOne({ code: line.accountCode }, { $inc: { balance: inc } }, { session });
       }
+
+      // Save GL ref on invoice
+      invoice.glEntryId     = glEntry._id;
+      invoice.glEntryNumber = journalNumber;
+      await invoice.save({ session });
 
       await session.commitTransaction();
       return { message: 'Invoice created successfully', data: invoice, glEntry };
-    } catch (error: any) {
+    } catch (err: any) {
       await session.abortTransaction();
-      this.logger.error('Error creating AP invoice', error);
-      throw new BadRequestException(error.message);
+      this.logger.error('Error creating AP invoice', err);
+      throw new BadRequestException(err.message);
     } finally {
       session.endSession();
     }
   }
 
+  // ─── AP Aging ──────────────────────────────────────────────────────────────
+
   async getAging() {
-    const invoices = await this.supplierInvoiceModel.find({ status: { $in: ['Unpaid', 'Partially Paid'] } }).exec();
+    const invoices = await this.supplierInvoiceModel
+      .find({ status: { $in: ['Unpaid', 'Partially Paid'] } })
+      .lean();
     const today = new Date();
     const agingByVendor: Record<string, any> = {};
 
-    invoices.forEach(inv => {
-      const vId = inv.vendorId?.toString() || 'unknown';
-      if (!agingByVendor[vId]) {
-        agingByVendor[vId] = {
-          vendorId: vId,
-          vendorName: inv.vendorName,
-          totalDue: 0,
-          current: 0,
-          thirtyToSixty: 0,
-          sixtyToNinety: 0,
-          overNinety: 0
+    for (const inv of invoices) {
+      const key = inv.vendorId?.toString() || inv.vendorName || 'unknown';
+      if (!agingByVendor[key]) {
+        agingByVendor[key] = {
+          vendorId:      inv.vendorId,
+          vendorName:    inv.vendorName,
+          totalDue:      0,
+          current:       0,   // not yet due
+          thirtyToSixty: 0,   // 30–60 days overdue
+          sixtyToNinety: 0,   // 60–90 days overdue
+          overNinety:    0,   // 90+ days overdue
         };
       }
-      const v = agingByVendor[vId];
+      const v   = agingByVendor[key];
       const due = inv.balanceDue || 0;
       v.totalDue += due;
 
-      const dueDate = new Date(inv.dueDate);
-      const diffTime = today.getTime() - dueDate.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const dueDate  = new Date(inv.dueDate);
+      const diffDays = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
 
-      if (diffDays <= 30) {
-        v.current += due;
-      } else if (diffDays > 30 && diffDays <= 60) {
-        v.thirtyToSixty += due;
-      } else if (diffDays > 60 && diffDays <= 90) {
-        v.sixtyToNinety += due;
-      } else {
-        v.overNinety += due;
-      }
-    });
+      if (diffDays <= 0)        v.current       += due;  // dueDate >= today
+      else if (diffDays <= 60)  v.thirtyToSixty += due;  // 1–60 days (docs say 30-60)
+      else if (diffDays <= 90)  v.sixtyToNinety += due;  // 61–90 days
+      else                      v.overNinety    += due;  // 90+ days
+    }
 
     return { data: Object.values(agingByVendor) };
   }
 
+  // ─── Payment Vouchers ─────────────────────────────────────────────────────
+
   async findAllVouchers(query: { vendorId?: string; status?: string }) {
     const filter: any = {};
     if (query.vendorId) filter.vendorId = query.vendorId;
-    if (query.status) filter.status = query.status;
-
-    const data = await this.paymentVoucherModel.find(filter).exec();
+    if (query.status)   filter.status   = query.status;
+    const data = await this.paymentVoucherModel.find(filter).sort({ paymentDate: -1 }).lean();
     return { data };
   }
 
@@ -197,35 +228,34 @@ export class ApService {
     const session = await this.connection.startSession();
     session.startTransaction();
     try {
-      const amount = dto.invoicesPaid?.reduce((sum: number, inv: any) => sum + (inv.amountPaid || 0), 0) || 0;
-      
-      let account;
+      const amount = (dto.invoicesPaid || []).reduce((s: number, i: any) => s + (i.amountPaid || 0), 0);
+
+      // Fetch bank / cash account
+      let account: any;
       if (dto.paymentMethod === 'Cash') {
         account = await this.cashAccountModel.findById(dto.bankAccountId).session(session);
       } else {
         account = await this.bankAccountModel.findById(dto.bankAccountId).session(session);
       }
-
       if (!account) throw new NotFoundException('Bank/Cash account not found');
 
-      if (account.balance < amount) {
-        throw new BadRequestException(`Insufficient funds. Available: ${account.balance}, Required: ${amount}`);
+      if ((account.balance || 0) < amount) {
+        throw new BadRequestException(
+          JSON.stringify({ message: 'Insufficient balance in selected account', available: account.balance, required: amount })
+        );
       }
 
+      // Deduct from account
       account.balance -= amount;
       await account.save({ session });
 
+      // Update each paid invoice
       for (const invPaid of (dto.invoicesPaid || [])) {
         const inv = await this.supplierInvoiceModel.findById(invPaid.invoiceId).session(session);
         if (inv) {
           inv.paidAmount = (inv.paidAmount || 0) + invPaid.amountPaid;
-          inv.balanceDue = (inv.balanceDue || 0) - invPaid.amountPaid;
-          
-          if (inv.balanceDue <= 0) {
-            inv.status = 'Paid';
-          } else if (inv.paidAmount > 0 && inv.balanceDue > 0) {
-            inv.status = 'Partially Paid';
-          }
+          inv.balanceDue = (inv.totalAmount || 0) - inv.paidAmount;
+          inv.status = inv.balanceDue <= 0 ? 'Paid' : 'Partially Paid';
           await inv.save({ session });
         }
       }
@@ -239,35 +269,47 @@ export class ApService {
         status: 'Posted',
         createdBy: userId,
       });
-
       await voucher.save({ session });
 
-      const bankCoaCode = account.coaCode || '111000'; // Default if not found
-      
+      // ── Auto-post GL ────────────────────────────────────────────────────
+      // DR 211000 (A/P)              = amount
+      // CR bankCOACode (111000 etc.) = amount
+      const bankCoaCode = account.coaCode || '111000';
+      const glLines: any[] = [
+        { accountCode: '211000',    accountName: 'Accounts Payable (A/P)', type: 'Debit',  amount },
+        { accountCode: bankCoaCode, accountName: account.bankName || 'Bank/Cash', type: 'Credit', amount },
+      ];
+
+      const journalNumber = await this.nextJENumber(session);
       const glEntry = new this.journalEntryModel({
-        entryDate: dto.paymentDate || new Date(),
+        journalNumber,
+        date: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
         reference: voucherNumber,
         sourceType: 'AP_Payment',
-        description: `AP Payment to ${dto.vendorName}`,
-        lines: [
-          { accountCode: '211000', debit: amount, credit: 0 }, // A/P
-          { accountCode: bankCoaCode, debit: 0, credit: amount } // Bank/Cash
-        ],
+        description: `AP Payment — ${dto.vendorName}`,
+        status: 'Posted',
+        totalDebit:  amount,
+        totalCredit: amount,
+        lines: glLines,
         createdBy: userId,
       });
-
       await glEntry.save({ session });
 
-      // Update COA balances
-      await this.coaModel.updateOne({ code: '211000' }, { $inc: { balance: amount } }, { session });
-      await this.coaModel.updateOne({ code: bankCoaCode }, { $inc: { balance: -amount } }, { session });
+      for (const line of glLines) {
+        const inc = line.type === 'Debit' ? line.amount : -line.amount;
+        await this.coaModel.updateOne({ code: line.accountCode }, { $inc: { balance: inc } }, { session });
+      }
+
+      voucher.glEntryId     = glEntry._id;
+      voucher.glEntryNumber = journalNumber;
+      await voucher.save({ session });
 
       await session.commitTransaction();
-      return { message: 'Payment voucher created successfully', data: voucher, glEntry };
-    } catch (error: any) {
+      return { message: 'Payment voucher posted successfully', data: voucher, glEntry };
+    } catch (err: any) {
       await session.abortTransaction();
-      this.logger.error('Error creating AP voucher', error);
-      throw new BadRequestException(error.message);
+      this.logger.error('Error creating AP voucher', err);
+      throw new BadRequestException(err.message);
     } finally {
       session.endSession();
     }

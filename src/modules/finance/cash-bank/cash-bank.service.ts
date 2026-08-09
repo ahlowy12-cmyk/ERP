@@ -15,22 +15,25 @@ export class CashBankService {
 
   async findAllBankAccounts() {
     const [bankAccounts, cashAccounts, pendingRecs] = await Promise.all([
-      this.bankAccountModel.find().exec(),
-      this.cashAccountModel.find().exec(),
+      this.bankAccountModel.find().lean().exec(),
+      this.cashAccountModel.find().lean().exec(),
       this.bankReconciliationModel.countDocuments({ status: 'Unreconciled' })
     ]);
 
-    const bankBalanceUSD = bankAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
-    const cashBalanceUSD = cashAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
-    const totalLiquidityUSD = bankBalanceUSD + cashBalanceUSD;
+    const bankBalance = bankAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const cashBalance = cashAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const totalBalance = bankBalance + cashBalance;
+    const activeAccounts = bankAccounts.filter(a => a.status !== 'Inactive').length
+                         + cashAccounts.filter(a => a.status !== 'Inactive').length;
 
     return {
       data: bankAccounts,
       kpis: {
-        totalLiquidityUSD,
-        bankBalanceUSD,
-        cashBalanceUSD,
-        pendingRecsCount: pendingRecs
+        totalBalance,
+        bankBalance,
+        cashBalance,
+        activeAccounts,
+        pendingRecsCount: pendingRecs,
       }
     };
   }

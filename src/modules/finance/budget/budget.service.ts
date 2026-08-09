@@ -78,13 +78,13 @@ export class BudgetService {
     return {
       data: processedBudgets,
       portfolioTotals: {
-        totalBudget: portfolioTotalBudget,
-        totalActual: portfolioTotalActual,
-        totalCommitted: portfolioTotalCommitted,
-        totalUsed: portfolioTotalActual + portfolioTotalCommitted,
-        totalVariance: portfolioTotalBudget - (portfolioTotalActual + portfolioTotalCommitted),
-        overBudgetCount: portfolioOverBudgetCount,
-        warningCount: portfolioWarningCount,
+        totalBudget:      portfolioTotalBudget,
+        totalActual:      portfolioTotalActual,
+        totalCommitted:   portfolioTotalCommitted,
+        totalUsed:        portfolioTotalActual + portfolioTotalCommitted,
+        totalVariance:    portfolioTotalBudget - (portfolioTotalActual + portfolioTotalCommitted),
+        overBudgetProjects: portfolioOverBudgetCount,
+        warningCount:     portfolioWarningCount,
       },
       meta: { total: totalCount, page, limit }
     };

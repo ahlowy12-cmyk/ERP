@@ -86,48 +86,57 @@ export class StatementsService {
 
   async getIncomeStatement(query: { periodStart?: string; asOfDate?: string }) {
     const periodStart = query.periodStart ? new Date(query.periodStart) : new Date(new Date().getFullYear(), 0, 1);
-    const asOfDate = query.asOfDate ? new Date(query.asOfDate) : new Date();
+    const asOfDate    = query.asOfDate    ? new Date(query.asOfDate)    : new Date();
 
     const activeAccounts = await this.coaModel.find({ isActive: true }).lean();
-    const accountTypeMap = activeAccounts.reduce((acc, a) => {
-      acc[a.code] = a.type;
-      return acc;
-    }, {} as Record<string, string>);
+    const accountMap     = activeAccounts.reduce((m: any, a: any) => { m[a.code] = a; return m; }, {});
 
     const entries = await this.journalEntryModel.find({
       status: 'Posted',
-      date: { $gte: periodStart, $lte: asOfDate },
+      date:   { $gte: periodStart, $lte: asOfDate },
     }).lean();
 
-    const revenueItems: Record<string, number> = {};
-    const expenseItems: Record<string, number> = {};
-
+    // Accumulate net per account
+    const accountNet: Record<string, number> = {};
     for (const entry of entries) {
       for (const line of (entry.lines as any[]) || []) {
-        const accType = accountTypeMap[line.accountCode];
-        const amount = line.amount || 0;
-        if (accType === 'Revenue') {
-          const net = line.type === 'Credit' ? amount : -amount;
-          revenueItems[line.accountCode] = (revenueItems[line.accountCode] || 0) + net;
-        } else if (accType === 'Expense') {
-          const net = line.type === 'Debit' ? amount : -amount;
-          expenseItems[line.accountCode] = (expenseItems[line.accountCode] || 0) + net;
-        }
+        if (!accountNet[line.accountCode]) accountNet[line.accountCode] = 0;
+        accountNet[line.accountCode] += line.type === 'Debit' ? (line.amount || 0) : -(line.amount || 0);
       }
     }
 
-    const revenue = Object.values(revenueItems).reduce((s, v) => s + v, 0);
-    const totalExpenses = Object.values(expenseItems).reduce((s, v) => s + v, 0);
-    const grossProfit = revenue;
-    const netProfit = grossProfit - totalExpenses;
+    // Group revenue and expense accounts
+    const revenueAccounts = activeAccounts.filter(a => a.type === 'Revenue' && !accountNet[a.code] === false || (accountNet[a.code] || 0) !== 0);
+    const expenseAccounts = activeAccounts.filter(a => a.type === 'Expense');
 
-    const data = [
-      { label: 'Revenue', amount: revenue, isSubtotal: false },
-      { label: 'Cost of Revenue', amount: 0, isNegative: true },
-      { label: 'Gross Profit', amount: grossProfit, isSubtotal: true },
-      { label: 'G&A Expenses', amount: -totalExpenses, isNegative: true },
-      { label: 'Net Profit', amount: netProfit, isTotal: true },
-    ];
+    let totalRevenue  = 0;
+    let totalExpenses = 0;
+    const data: any[] = [];
+
+    // Revenue section
+    data.push({ label: 'Revenue', amount: 0, isHeader: true });
+    for (const acc of activeAccounts.filter(a => a.type === 'Revenue')) {
+      // Revenue accounts: Credit increases (negative net = credit = positive revenue)
+      const amount = -(accountNet[acc.code] || 0);
+      if (amount === 0) continue;
+      data.push({ label: acc.name, amount, indent: true, code: acc.code });
+      totalRevenue += amount;
+    }
+    data.push({ label: 'Total Revenue', amount: totalRevenue, isSubtotal: true });
+
+    // Expense section
+    data.push({ label: 'Expenses', amount: 0, isHeader: true });
+    for (const acc of activeAccounts.filter(a => a.type === 'Expense')) {
+      // Expense accounts: Debit increases (positive net = debit = positive expense)
+      const amount = accountNet[acc.code] || 0;
+      if (amount === 0) continue;
+      data.push({ label: acc.name, amount, indent: true, code: acc.code });
+      totalExpenses += amount;
+    }
+    data.push({ label: 'Total Expenses', amount: totalExpenses, isSubtotal: true });
+
+    const netProfit = totalRevenue - totalExpenses;
+    data.push({ label: 'Net Profit / (Loss)', amount: netProfit, isTotal: true });
 
     return { data };
   }
@@ -160,24 +169,28 @@ export class StatementsService {
 
     for (const acc of activeAccounts) {
       const rawBalance = accountBalances[acc.code] || 0;
+      if (rawBalance === 0) continue; // skip zero-balance accounts
+
       if (acc.type === 'Asset') {
-        const bal = rawBalance; // positive = debit normal balance
+        const bal  = rawBalance; // positive = debit = normal balance for assets
         const item = { code: acc.code, name: acc.name, amount: bal };
-        // codes starting with 1 = current, others = non-current
-        if (acc.code.startsWith('1')) currentAssetItems.push(item);
+        // 14xxxx = Fixed Assets (non-current), everything else under 1xxxxx = current
+        if (acc.code.startsWith('14')) nonCurrentAssetItems.push(item);
+        else if (acc.code.startsWith('1'))  currentAssetItems.push(item);
         else nonCurrentAssetItems.push(item);
       } else if (acc.type === 'Liability') {
-        const bal = -rawBalance; // liabilities have credit normal balance
+        const bal  = -rawBalance; // credit normal balance → negate for display
         const item = { code: acc.code, name: acc.name, amount: bal };
-        if (acc.code.startsWith('2')) currentLiabilityItems.push(item);
+        // 21xxxx = current liabilities, 22xxxx+ = non-current
+        if (acc.code.startsWith('21')) currentLiabilityItems.push(item);
         else nonCurrentLiabilityItems.push(item);
       } else if (acc.type === 'Equity') {
-        equityTotal += -rawBalance; // equity credit normal balance
+        equityTotal += -rawBalance;
       }
     }
 
     const incomeData = await this.getIncomeStatement({ asOfDate: query.asOfDate });
-    const netProfit = (incomeData.data.find(d => d.label === 'Net Profit') as any)?.amount || 0;
+    const netProfit = (incomeData.data.find((d: any) => d.label === 'Net Profit / (Loss)') as any)?.amount || 0;
 
     const currentAssetTotal = currentAssetItems.reduce((s, i) => s + i.amount, 0);
     const nonCurrentAssetTotal = nonCurrentAssetItems.reduce((s, i) => s + i.amount, 0);

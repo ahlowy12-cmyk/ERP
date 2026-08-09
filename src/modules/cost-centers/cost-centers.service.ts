@@ -84,10 +84,10 @@ export class CostCentersService {
 
     // Portfolio totals
     const financeTotals = {
-      totalBudget: enriched.reduce((s, c) => s + c.totalBudget, 0),
-      totalSpent: enriched.reduce((s, c) => s + c.totalSpent, 0),
-      remaining: enriched.reduce((s, c) => s + c.remaining, 0),
-      projectsCount: enriched.reduce((s, c) => s + c.projectsCount, 0),
+      totalBudget:     enriched.reduce((s, c) => s + c.totalBudget, 0),
+      totalSpent:      enriched.reduce((s, c) => s + c.totalSpent, 0),
+      totalRemaining:  enriched.reduce((s, c) => s + c.remaining, 0),
+      projectsCount:   enriched.reduce((s, c) => s + c.projectsCount, 0),
     };
 
     return { data: enriched, financeTotals, totalItems, currentPage: Number(page) };

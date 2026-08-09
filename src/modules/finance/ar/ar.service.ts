@@ -32,6 +32,27 @@ export class ArService {
     throw new BadRequestException(`Could not generate next number for ${prefix}`);
   }
 
+  private async nextJENumber(session?: any): Promise<string> {
+    const year   = new Date().getFullYear();
+    const prefix = `JE-${year}-`;
+    for (let i = 0; i < 5; i++) {
+      const last = await this.journalEntryModel.findOne(
+        { journalNumber: { $regex: `^${prefix}` } },
+        {},
+        { sort: { journalNumber: -1 }, session }
+      );
+      let nextNum = 1;
+      if (last?.journalNumber) {
+        const parts = last.journalNumber.split('-');
+        if (parts.length === 3) nextNum = parseInt(parts[2], 10) + 1;
+      }
+      const journalNumber = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+      const exists = await this.journalEntryModel.exists({ journalNumber }).session?.(session);
+      if (!exists) return journalNumber;
+    }
+    throw new Error('Could not generate unique JE number');
+  }
+
   async findAllInvoices(query: { status?: string; clientName?: string; search?: string; page?: number; limit?: number }) {
     const filter: any = {};
     if (query.status) filter.status = query.status;
@@ -170,27 +191,29 @@ export class ArService {
 
       // Auto-post GL: DR bank coaCode, CR 121000 (A/R)
       const glLines = [
-        { accountCode: bankCoaCode, accountName: account.bankName || 'Bank/Cash', type: 'Debit', amount, notes: `Collection from ${dto.customerName}` },
-        { accountCode: '121000', accountName: 'Accounts Receivable A/R', type: 'Credit', amount, notes: `Collection from ${dto.customerName}` },
+        { accountCode: bankCoaCode, accountName: account.bankName || 'Bank/Cash', type: 'Debit',  amount, notes: `Collection from ${dto.customerName}` },
+        { accountCode: '121000',    accountName: 'Accounts Receivable (A/R)',     type: 'Credit', amount, notes: `Collection from ${dto.customerName}` },
       ];
 
+      const journalNumber = await this.nextJENumber(session);
       const glEntry = new this.journalEntryModel({
-        date: dto.collectionDate ? new Date(dto.collectionDate) : new Date(),
-        reference: voucherNumber,
-        sourceType: 'AR_Collection',
+        journalNumber,
+        date:        dto.collectionDate ? new Date(dto.collectionDate) : new Date(),
+        reference:   voucherNumber,
+        sourceType:  'AR_Collection',
         description: `AR Collection from ${dto.customerName}`,
-        totalDebit: amount,
+        totalDebit:  amount,
         totalCredit: amount,
-        status: 'Posted',
-        lines: glLines,
-        createdBy: userId,
+        status:      'Posted',
+        lines:       glLines,
+        createdBy:   userId,
       });
 
       await glEntry.save({ session });
 
       // Update COA balances
-      await this.coaModel.updateOne({ code: bankCoaCode }, { $inc: { balance: amount } }, { session });
-      await this.coaModel.updateOne({ code: '121000' }, { $inc: { balance: -amount } }, { session });
+      await this.coaModel.updateOne({ code: bankCoaCode }, { $inc: { balance: amount  } }, { session });
+      await this.coaModel.updateOne({ code: '121000'   }, { $inc: { balance: -amount } }, { session });
 
       await session.commitTransaction();
       return { message: 'Collection voucher created successfully', data: voucher, glEntry };

@@ -20,10 +20,11 @@ export class VatService {
     const { periodStart, periodEnd } = query;
     const dateFilter: any = {};
     if (periodStart) dateFilter.$gte = new Date(periodStart);
-    if (periodEnd) dateFilter.$lte = new Date(periodEnd);
+    if (periodEnd)   dateFilter.$lte = new Date(periodEnd);
 
-    const jeFilter: any = { status: 'Posted', 'lines.accountCode': '411000' };
-    if (Object.keys(dateFilter).length > 0) jeFilter.date = dateFilter;
+    // ── Output VAT: Revenue lines in GL ──────────────────────────────────
+    const jeFilter: any = { status: 'Posted', 'lines.accountCode': { $in: ['410000', '420000'] } };
+    if (Object.keys(dateFilter).length) jeFilter.date = dateFilter;
 
     const journalEntries = await this.journalEntryModel.find(jeFilter).lean();
 
@@ -33,20 +34,19 @@ export class VatService {
 
     for (const je of journalEntries) {
       for (const line of (je.lines as any[]) || []) {
-        if (line.accountCode === '411000') {
-          // Revenue lines have Credit type with positive amount
+        if (['410000', '420000'].includes(line.accountCode)) {
           const netAmount = line.type === 'Credit' ? (line.amount || 0) : 0;
           if (netAmount <= 0) continue;
           const vatAmount = netAmount * 0.15;
           outputLines.push({
-            ref: je.journalNumber || je.reference,
-            date: je.date,
-            party: je.description || '',
-            description: `${je.sourceType} — ${je.reference || ''}`,
+            ref:         je.journalNumber || je.reference,
+            date:        je.date,
+            party:       je.description || '',
+            description: `${je.sourceType || ''} — ${je.reference || ''}`,
             netAmount,
             vatAmount,
             vatRate: 15,
-            type: 'output',
+            type:    'output',
           });
           totalOutputNet += netAmount;
           totalOutputVat += vatAmount;
@@ -54,8 +54,9 @@ export class VatService {
       }
     }
 
+    // ── Input VAT: Supplier Invoices ──────────────────────────────────────
     const apFilter: any = {};
-    if (Object.keys(dateFilter).length > 0) apFilter.invoiceDate = dateFilter;
+    if (Object.keys(dateFilter).length) apFilter.invoiceDate = dateFilter;
 
     const supplierInvoices = await this.supplierInvoiceModel.find(apFilter).lean();
 
@@ -65,16 +66,16 @@ export class VatService {
 
     for (const inv of supplierInvoices) {
       const vatAmount = inv.taxAmount || 0;
-      const netAmount = (inv.subTotal || 0);
+      const netAmount = inv.subTotal  || 0;
       inputLines.push({
-        ref: inv.invoiceNumber,
-        date: inv.invoiceDate,
-        party: inv.vendorName || '',
-        description: inv.poNumber ? `PO: ${inv.poNumber}` : inv.chargeType || '',
+        ref:         inv.invoiceNumber,
+        date:        inv.invoiceDate,
+        party:       inv.vendorName || '',
+        description: inv.poNumber ? `PO: ${inv.poNumber}` : (inv.chargeType || ''),
         netAmount,
         vatAmount,
         vatRate: 15,
-        type: 'input',
+        type:    'input',
       });
       totalInputNet += netAmount;
       totalInputVat += vatAmount;
@@ -83,28 +84,28 @@ export class VatService {
     const netVatPayable = totalOutputVat - totalInputVat;
 
     return {
-      summary: {
-        totalOutputNet,
-        totalOutputVat,
-        totalInputNet,
-        totalInputVat,
-        netVatPayable,
-        effectiveOutputRate: 15,
-        effectiveInputRate: 15,
-      },
-      outputLines,
-      inputLines,
+      data: {
+        summary: {
+          totalOutputNet, totalOutputVat,
+          totalInputNet,  totalInputVat,
+          netVatPayable,
+          effectiveOutputRate: 15,
+          effectiveInputRate:  15,
+        },
+        outputLines,
+        inputLines,
+      }
     };
   }
 
   private async nextJENumber(session?: any): Promise<string> {
-    const year = new Date().getFullYear();
+    const year   = new Date().getFullYear();
     const prefix = `JE-${year}-`;
     for (let i = 0; i < 5; i++) {
       const last = await this.journalEntryModel.findOne(
         { journalNumber: { $regex: `^${prefix}` } },
         {},
-        { sort: { journalNumber: -1 }, session },
+        { sort: { journalNumber: -1 }, session }
       );
       let nextNum = 1;
       if (last?.journalNumber) {
@@ -119,8 +120,9 @@ export class VatService {
   }
 
   async postSettlement(dto: { periodStart: string; periodEnd: string }, userId: string) {
-    const report = await this.getReport(dto);
-    const { netVatPayable } = report.summary;
+    // Fetch report to get computed VAT figures
+    const reportResult = await this.getReport(dto);
+    const { totalOutputVat, totalInputVat, netVatPayable } = reportResult.data.summary;
 
     if (Math.abs(netVatPayable) < 0.01) {
       throw new BadRequestException('No VAT difference to settle');
@@ -130,47 +132,68 @@ export class VatService {
     session.startTransaction();
     try {
       const journalNumber = await this.nextJENumber(session);
-      const absAmount = Math.abs(netVatPayable);
 
-      const lines = netVatPayable > 0
-        ? [
-            { accountCode: '521000', accountName: 'G&A Costs', type: 'Debit', amount: absAmount, notes: 'VAT Settlement - Payable' },
-            { accountCode: '214000', accountName: 'VAT Payable', type: 'Credit', amount: absAmount, notes: 'VAT Control' },
-          ]
-        : [
-            { accountCode: '121000', accountName: 'Accounts Receivable A/R', type: 'Debit', amount: absAmount, notes: 'VAT Settlement - Refundable' },
-            { accountCode: '214000', accountName: 'VAT Payable', type: 'Credit', amount: absAmount, notes: 'VAT Control' },
-          ];
+      let glLines: any[];
+      let totalDebit: number;
+      let totalCredit: number;
 
-      const newJE = new this.journalEntryModel({
+      if (netVatPayable > 0) {
+        // Company owes GAZT (output > input)
+        // DR 214000 (VAT Payable)      = totalOutputVAT
+        // CR 215000 (VAT Receivable)   = totalInputVAT
+        // CR 211000 (A/P — GAZT)       = netVatPayable
+        glLines = [
+          { accountCode: '214000', accountName: 'VAT Payable',         type: 'Debit',  amount: totalOutputVat },
+          { accountCode: '215000', accountName: 'VAT Receivable',       type: 'Credit', amount: totalInputVat  },
+          { accountCode: '211000', accountName: 'Accounts Payable (A/P — GAZT)', type: 'Credit', amount: netVatPayable },
+        ];
+        totalDebit  = totalOutputVat;
+        totalCredit = totalInputVat + netVatPayable;
+      } else {
+        // Refund due from GAZT
+        // DR 215000 (VAT Receivable)   = totalInputVAT
+        // DR 211000 / Other            = abs(netVatPayable)  [refund claim]
+        // CR 214000 (VAT Payable)      = totalOutputVAT
+        const refundDue = Math.abs(netVatPayable);
+        glLines = [
+          { accountCode: '215000', accountName: 'VAT Receivable',  type: 'Debit',  amount: totalInputVat  },
+          { accountCode: '121000', accountName: 'A/R — VAT Refund', type: 'Debit',  amount: refundDue      },
+          { accountCode: '214000', accountName: 'VAT Payable',     type: 'Credit', amount: totalOutputVat },
+        ];
+        totalDebit  = totalInputVat + refundDue;
+        totalCredit = totalOutputVat;
+      }
+
+      const refLabel = `VAT-SETTLE-${dto.periodStart}-TO-${dto.periodEnd}`;
+
+      const glEntry = new this.journalEntryModel({
         journalNumber,
-        reference: `VAT-SETTLE-${dto.periodStart}-TO-${dto.periodEnd}`,
-        sourceType: 'VAT_Settlement',
-        date: new Date(),
-        status: 'Posted',
+        reference:   refLabel,
+        sourceType:  'VAT_Settlement',
+        date:        new Date(),
         description: `VAT Settlement ${dto.periodStart} to ${dto.periodEnd}`,
-        totalDebit: absAmount,
-        totalCredit: absAmount,
-        lines,
-        createdBy: userId,
+        status:      'Posted',
+        totalDebit,
+        totalCredit,
+        lines:       glLines,
+        createdBy:   userId,
       });
-      await newJE.save({ session });
+      await glEntry.save({ session });
 
       // Update COA balances
-      if (netVatPayable > 0) {
-        await this.coaModel.updateOne({ code: '521000' }, { $inc: { balance: absAmount } }, { session });
-        await this.coaModel.updateOne({ code: '214000' }, { $inc: { balance: -absAmount } }, { session });
-      } else {
-        await this.coaModel.updateOne({ code: '121000' }, { $inc: { balance: absAmount } }, { session });
-        await this.coaModel.updateOne({ code: '214000' }, { $inc: { balance: -absAmount } }, { session });
+      for (const line of glLines) {
+        const inc = line.type === 'Debit' ? line.amount : -line.amount;
+        await this.coaModel.updateOne({ code: line.accountCode }, { $inc: { balance: inc } }, { session });
       }
 
       await session.commitTransaction();
       return {
-        message: 'VAT settlement posted successfully',
-        netVatPayable,
-        type: netVatPayable > 0 ? 'payable' : 'receivable',
-        glEntry: newJE,
+        data: {
+          message:       'VAT settlement posted successfully',
+          netVatPayable,
+          type:          netVatPayable > 0 ? 'payable' : 'receivable',
+          glEntry,
+        }
       };
     } catch (error) {
       await session.abortTransaction();
