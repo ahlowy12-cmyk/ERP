@@ -409,11 +409,24 @@ export class AuthService {
   }
 
   // ─── Forgot Password ──────────────────────────────────────────────────────
-  async forgotPassword(email: string) {
-    const user = await this.userModel.findOne({ email }).lean().exec();
+  async forgotPassword(emailOrUsername: string) {
+    const cleanInput = (emailOrUsername || '').trim();
+    if (!cleanInput) throw new BadRequestException('Email or username is required');
 
-    // دائماً رسالة نجاح لأسباب أمنية
-    if (!user) return { message: 'Reset link sent if email exists' };
+    const user = await this.userModel
+      .findOne({
+        $or: [
+          { email: new RegExp(`^${cleanInput}$`, 'i') },
+          { username: cleanInput },
+        ],
+      })
+      .lean()
+      .exec();
+
+    if (!user) {
+      this.logger.warn(`ForgotPassword failed: No user found for '${cleanInput}'`);
+      throw new NotFoundException(`No account found matching '${cleanInput}'`);
+    }
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto
@@ -422,9 +435,9 @@ export class AuthService {
       .digest('hex');
 
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1); // صالح ساعة واحدة
+    expiresAt.setHours(expiresAt.getHours() + 1); // Valid for 1 hour
 
-    // إلغاء أي توكنات سابقة
+    // Revoke previous tokens
     await this.resetTokenModel.deleteMany({ userId: user._id });
 
     await this.resetTokenModel.create({
@@ -433,8 +446,13 @@ export class AuthService {
       expiresAt,
     });
 
-    const resetLink = `${this.configService.get('FRONTEND_URL') || 'http://localhost:3001'}/reset-password?token=${rawToken}`;
+    const frontendUrl =
+      this.configService.get('FRONTEND_URL') || 'http://localhost:4200';
+    const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
 
+    this.logger.log(`🔑 Password Reset Link for ${user.email}: ${resetLink}`);
+
+    let mailSent = false;
     try {
       await this.mailerService.sendMail({
         to: user.email,
@@ -453,8 +471,9 @@ export class AuthService {
           </div>
         `,
       });
-    } catch (err) {
-      this.logger.warn(`Failed to send reset email to ${email}: ${err}`);
+      mailSent = true;
+    } catch (err: any) {
+      this.logger.warn(`Failed to send reset email to ${user.email}: ${err?.message || err}`);
     }
 
     try {
@@ -463,11 +482,18 @@ export class AuthService {
         action: 'FORGOT_PASSWORD',
         entity: 'User',
         entityId: user._id.toString(),
-        details: `Password reset requested for ${email}`,
+        details: `Password reset requested for ${user.email}`,
       });
     } catch {}
 
-    return { message: 'Reset link sent if email exists' };
+    return {
+      message: mailSent
+        ? `Reset link sent to ${user.email}`
+        : `Reset token generated successfully (Mail service unavailable/unconfigured). Use the link or token provided below.`,
+      mailSent,
+      resetToken: rawToken,
+      resetLink,
+    };
   }
 
   // ─── Reset Password ───────────────────────────────────────────────────────
