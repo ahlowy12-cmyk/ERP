@@ -33,24 +33,27 @@ import { PasswordResetTokenModel } from 'src/modules/admin/users/entities/passwo
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: config.get<string>('MAIL_HOST') || 'smtp.gmail.com',
-          port: Number(config.get('MAIL_PORT') || 587),
-          secure: Number(config.get('MAIL_PORT')) === 465,
-          auth: config.get<string>('MAIL_USER') && config.get<string>('MAIL_PASS')
-            ? {
-                user: config.get<string>('MAIL_USER'),
-                pass: config.get<string>('MAIL_PASS'),
-              }
-            : undefined,
-          connectionTimeout: 4000, // 4 seconds max timeout
-          socketTimeout: 4000,
-        },
-        defaults: {
-          from: `"PetroFlow ERP" <${config.get<string>('MAIL_FROM') || config.get<string>('MAIL_USER') || 'noreply@petroflow.com'}>`,
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const rawPass = config.get<string>('MAIL_PASS') || '';
+        const mailPass = rawPass.replace(/\s+/g, ''); // Remove spaces from App Password if present
+        const mailUser = config.get<string>('MAIL_USER') || '';
+        const mailHost = config.get<string>('MAIL_HOST') || 'smtp.gmail.com';
+        const mailPort = Number(config.get('MAIL_PORT') || 587);
+
+        return {
+          transport: {
+            host: mailHost,
+            port: mailPort,
+            secure: mailPort === 465,
+            auth: mailUser && mailPass ? { user: mailUser, pass: mailPass } : undefined,
+            connectionTimeout: 8000,
+            socketTimeout: 8000,
+          },
+          defaults: {
+            from: config.get<string>('MAIL_FROM') || `"PetroFlow ERP" <${mailUser || 'noreply@petroflow.com'}>`,
+          },
+        };
+      },
     }),
 
     // Models
