@@ -1,24 +1,32 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { ConfigService } from '@nestjs/config';
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { LocalStrategy } from './strategies/local.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy';
+import { UserModel } from '../admin/users/entities/user.model';
+import { RoleModel } from '../admin/roles/entities/role.model';
 
-@Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private configService: ConfigService) {
-    super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('JWT_SECRET') || 'defaultSecretKey', // يجب إضافته في ملف .env
-    });
-  }
-
-  async validate(payload: any) {
-    // هذه الدالة ترجع البيانات التي سيتم حقنها في req.user
-    if (!payload) {
-      throw new UnauthorizedException('Invalid token payload');
-    }
-    return { userId: payload.sub, email: payload.email, role: payload.role };
-  }
-}
+@Module({
+  imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET') || 'defaultSecretKey',
+        signOptions: {
+          expiresIn: (config.get<string>('JWT_EXPIRES_IN') || '24h') as any,
+        },
+      }),
+    }),
+    UserModel,
+    RoleModel,
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, LocalStrategy, JwtStrategy],
+  exports: [AuthService, JwtModule],
+})
+export class AuthModule {}
