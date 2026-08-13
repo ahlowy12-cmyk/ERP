@@ -25,38 +25,9 @@ async function bootstrap() {
     }),
   );
 
-  // 2. Enable CORS with support for ALLOWED_ORIGIN env, localhost dev ports, and credentials
-  const envOrigins = process.env.ALLOWED_ORIGIN
-    ? process.env.ALLOWED_ORIGIN.split(',').map((o) => o.trim())
-    : [];
-
-  const defaultLocalOrigins = [
-    'http://localhost:4200',
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:4200',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-  ];
-
+  // 2. Enable CORS — allow ALL origins (*) unconditionally for testing
   app.enableCors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, Postman, curl)
-      if (!origin) return callback(null, true);
-
-      const isAllowed =
-        envOrigins.includes('*') ||
-        envOrigins.includes(origin) ||
-        defaultLocalOrigins.includes(origin) ||
-        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        // Fallback: reflect incoming origin to prevent preflight CORS blocks
-        callback(null, origin);
-      }
-    },
+    origin: true, // Dynamically allows any origin (*) with credentials support
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: [
       'Content-Type',
