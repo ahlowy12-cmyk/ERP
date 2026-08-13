@@ -16,7 +16,7 @@ import { DatabaseModule } from './DB/database.module';
 import { SharedModule } from './shared/shared.module';
 
 // 👥 استيراد موديولات المصادقة والإدارة
-import { AuthModule } from './modules/auth/auth.module';
+import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './modules/admin/users/users.module';
 import { RolesModule } from './modules/admin/roles/roles.module';
 import { DepartmentsModule } from './modules/admin/departments/departments.module';

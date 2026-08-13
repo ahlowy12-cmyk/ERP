@@ -21,13 +21,16 @@ async function bootstrap() {
   // 1. تفعيل Helmet لحماية الـ HTTP Headers من ثغرات الويب المعروفة
   app.use(helmet());
 
-  // 2. تفعيل الـ CORS والسماح لدومين الفرونت إند فقط بالاتصال
-   app.enableCors()
- // {
-  //   origin: process.env.ALLOWED_ORIGIN || 'https://erp.petroflow.com',
-  //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  //   credentials: true,
-  // });
+  // 2. Enable CORS
+  const allowedOrigins = process.env.ALLOWED_ORIGIN
+    ? process.env.ALLOWED_ORIGIN.split(',').map((o) => o.trim())
+    : true;
+
+  app.enableCors({
+    origin: allowedOrigins,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
 
   //3. تفعيل جدار الحماية للبيانات (Validation Pipe) عالمياً باستخدام الـ DTOs
   app.useGlobalPipes(

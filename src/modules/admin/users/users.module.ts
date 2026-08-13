@@ -5,7 +5,6 @@ import { UsersController } from './users.controller';
 import { UserModel } from './entities/user.model';
 import { RoleModel } from '../roles/entities/role.model';
 import { RefreshTokenModel } from './entities/refresh-token.model';
-import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
   imports: [
@@ -13,7 +12,6 @@ import { AuthModule } from 'src/auth/auth.module';
     UserModel,
     RoleModel,
     RefreshTokenModel,
-    AuthModule, // للحصول على MailerModule
   ],
   providers: [UsersService],
   controllers: [UsersController],
