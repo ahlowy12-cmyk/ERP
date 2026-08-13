@@ -35,21 +35,20 @@ import { PasswordResetTokenModel } from 'src/modules/admin/users/entities/passwo
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         transport: {
-          host: config.get<string>('MAIL_HOST') ?? 'smtp.gmail.com',
-          port: Number(config.get('MAIL_PORT') ?? 587),
-          secure: false,
-          auth: {
-            user: config.get<string>('MAIL_USER'),
-            pass: config.get<string>('MAIL_PASS'),
-          },
+          host: config.get<string>('MAIL_HOST') || 'smtp.gmail.com',
+          port: Number(config.get('MAIL_PORT') || 587),
+          secure: Number(config.get('MAIL_PORT')) === 465,
+          auth: config.get<string>('MAIL_USER') && config.get<string>('MAIL_PASS')
+            ? {
+                user: config.get<string>('MAIL_USER'),
+                pass: config.get<string>('MAIL_PASS'),
+              }
+            : undefined,
+          connectionTimeout: 4000, // 4 seconds max timeout
+          socketTimeout: 4000,
         },
         defaults: {
-          from: `"PetroFlow ERP" <${config.get<string>('MAIL_FROM') ?? config.get<string>('MAIL_USER')}>`,
-        },
-        template: {
-          dir: join(__dirname, 'templates'),
-          adapter: new HandlebarsAdapter(),
-          options: { strict: true },
+          from: `"PetroFlow ERP" <${config.get<string>('MAIL_FROM') || config.get<string>('MAIL_USER') || 'noreply@petroflow.com'}>`,
         },
       }),
     }),
