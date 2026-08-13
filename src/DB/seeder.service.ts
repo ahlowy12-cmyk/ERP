@@ -455,21 +455,30 @@ export class SeederService implements OnApplicationBootstrap {
       $or: [{ username: 'superadmin' }, { email: adminEmail }],
     });
 
-    if (adminExists) {
-      // تحديث الـ roleId للمستخدم الموجود ليكون Super Admin
-      await this.userModel.updateOne(
-        { _id: adminExists._id },
-        { $set: { roleId: superAdminRole, status: 'Active' } },
-      );
-      this.logger.log(
-        '  ✔ Super Admin user already exists — role updated to Super Admin.',
-      );
-      return;
-    }
-
     const defaultPassword =
       process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@123456';
     const passwordHash = await bcrypt.hash(defaultPassword, 12);
+
+    if (adminExists) {
+      // تحديث الـ roleId وكلمة المرور وإلغاء القفل لضمان إمكانية تسجيل الدخول
+      await this.userModel.updateOne(
+        { _id: adminExists._id },
+        {
+          $set: {
+            roleId: superAdminRole,
+            status: 'Active',
+            passwordHash,
+            failedLoginAttempts: 0,
+            lockedUntil: null,
+            mustChangePassword: false,
+          },
+        },
+      );
+      this.logger.log(
+        `  ✔ Super Admin credentials & status updated (username: superadmin | password: ${defaultPassword}).`,
+      );
+      return;
+    }
 
     await this.userModel.create({
       username: 'superadmin',

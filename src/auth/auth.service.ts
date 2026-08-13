@@ -49,13 +49,23 @@ export class AuthService {
 
   // ─── Validate User (used by LocalStrategy) ────────────────────────────────
   async validateUser(username: string, password: string) {
+    const cleanUsername = (username || '').trim();
     const user = await this.userModel
-      .findOne({ $or: [{ username }, { email: username }] })
+      .findOne({
+        $or: [
+          { username: cleanUsername },
+          { email: cleanUsername.toLowerCase() },
+          { username: new RegExp(`^${cleanUsername}$`, 'i') },
+        ],
+      })
       .populate({ path: 'roleId', model: RoleModelName })
       .lean()
       .exec();
 
-    if (!user) return null;
+    if (!user) {
+      this.logger.warn(`Login failed: User '${cleanUsername}' not found`);
+      return null;
+    }
 
     // فحص الحساب المقفل
     if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
