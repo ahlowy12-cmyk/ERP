@@ -36,6 +36,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
         .join(', ');
     }
 
+    const request = ctx.getRequest<any>();
+    const origin = request.headers?.origin || '*';
+
+    response.header('Access-Control-Allow-Origin', origin);
+    response.header('Access-Control-Allow-Credentials', 'true');
+    response.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With, Origin');
+    response.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+
     response.status(status).json({
       success: false,
       statusCode: status,

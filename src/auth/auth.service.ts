@@ -439,12 +439,19 @@ export class AuthService {
       await this.mailerService.sendMail({
         to: user.email,
         subject: 'PetroFlow ERP — Password Reset Request',
-        template: 'reset-password',
-        context: {
-          fullName: user.fullName,
-          resetLink,
-          expiresInMinutes: 60,
-        },
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <h2 style="color: #1e3a8a;">PetroFlow ERP — Password Reset</h2>
+            <p>Hello <strong>${user.fullName || 'User'}</strong>,</p>
+            <p>You requested a password reset for your PetroFlow ERP account.</p>
+            <p style="margin: 25px 0;">
+              <a href="${resetLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Reset Password</a>
+            </p>
+            <p>This link is valid for <strong>60 minutes</strong>. If you did not request this, please ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin-top: 30px;" />
+            <small style="color: #6b7280;">PetroFlow ERP System &mdash; Confidential</small>
+          </div>
+        `,
       });
     } catch (err) {
       this.logger.warn(`Failed to send reset email to ${email}: ${err}`);
