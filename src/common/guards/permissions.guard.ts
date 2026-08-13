@@ -25,21 +25,22 @@ export class PermissionsGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
+    // No permission annotation on this route — allow
     if (!requiredPermissions || requiredPermissions.length === 0) return true;
 
     const { user } = context.switchToHttp().getRequest();
+    if (!user) return true; // JwtAuthGuard will handle unauthenticated
 
-    if (!user || !user.permissions) {
-      throw new ForbiddenException(
-        'Access denied. User permissions are missing.',
-      );
-    }
-
-    // Super Admin يمر دائماً
+    // Super Admin bypasses all permission checks
     if (user.role === UserRole.SuperAdmin) return true;
 
+    // Treat missing permissions as empty array (not an error)
+    const userPermissions: string[] = Array.isArray(user.permissions)
+      ? user.permissions
+      : [];
+
     const hasPermission = requiredPermissions.every((perm) =>
-      user.permissions.includes(perm),
+      userPermissions.includes(perm),
     );
 
     if (!hasPermission) {
