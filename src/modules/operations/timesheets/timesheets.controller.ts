@@ -52,6 +52,14 @@ export class TimesheetsController {
     @Body() dto: any,
   ) { return this.svc.updateDay(id, Number(dayNumber), dto); }
 
+  // Alias: PATCH /api/v1/operations/timesheets/:id/days/:dayIndex
+  @Patch('timesheets/:id/days/:dayIndex')
+  updateDayAlias(
+    @Param('id') id: string,
+    @Param('dayIndex') dayIndex: string,
+    @Body() dto: any,
+  ) { return this.svc.updateDay(id, Number(dayIndex), dto); }
+
   // PATCH /api/v1/operations/timesheets/:id/status
   @Patch('timesheets/:id/status')
   updateStatus(

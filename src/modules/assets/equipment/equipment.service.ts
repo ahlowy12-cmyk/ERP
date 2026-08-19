@@ -189,4 +189,85 @@ export class EquipmentService {
     await this.equipmentModel.findByIdAndDelete(id);
     return { message: 'Equipment deleted successfully' };
   }
+
+  // ─── Assign (API endpoint) ─────────────────────────────────────────────────
+  async assign(id: string, dto: { projectCode?: string; projectId?: string; assignedTo?: string; notes?: string }, userId: string) {
+    const eq = await this.equipmentModel.findById(id);
+    if (!eq) throw new NotFoundException('Equipment not found');
+
+    const updated = await this.equipmentModel.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          status: 'Active',
+          projectAssignment: dto.projectCode || eq.projectAssignment,
+          projectId: dto.projectId || eq.projectId,
+          assignedTo: dto.assignedTo,
+          notes: dto.notes,
+        },
+      },
+      { new: true },
+    ).lean();
+
+    this.logger.log(`Equipment ${eq.equipmentCode} assigned by ${userId}`);
+    return { message: 'Equipment assigned successfully', data: updated };
+  }
+
+  // ─── Transfer ─────────────────────────────────────────────────────────────
+  async transfer(id: string, dto: { toProjectCode?: string; toLocation?: string; reason?: string; transferDate?: string }, userId: string) {
+    const eq = await this.equipmentModel.findById(id);
+    if (!eq) throw new NotFoundException('Equipment not found');
+
+    const updated = await this.equipmentModel.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          projectAssignment: dto.toProjectCode || eq.projectAssignment,
+          location: dto.toLocation || eq.location,
+          lastTransferDate: dto.transferDate ? new Date(dto.transferDate) : new Date(),
+          lastTransferReason: dto.reason,
+        },
+        $push: {
+          transferHistory: {
+            fromProject: eq.projectAssignment,
+            toProject: dto.toProjectCode,
+            toLocation: dto.toLocation,
+            reason: dto.reason,
+            date: dto.transferDate ? new Date(dto.transferDate) : new Date(),
+            movedBy: userId,
+          },
+        } as any,
+      },
+      { new: true },
+    ).lean();
+
+    this.logger.log(`Equipment ${eq.equipmentCode} transferred by ${userId}`);
+    return { message: 'Equipment transferred successfully', data: updated };
+  }
+
+  // ─── Scrap ────────────────────────────────────────────────────────────────
+  async scrap(id: string, dto: { reason: string; scrapDate?: string; scrapValue?: number; notes?: string }, userId: string) {
+    const eq = await this.equipmentModel.findById(id);
+    if (!eq) throw new NotFoundException('Equipment not found');
+    if (eq.status === 'Scrapped') throw new BadRequestException('Equipment is already scrapped');
+
+    const updated = await this.equipmentModel.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          status: 'Scrapped',
+          scrapReason: dto.reason,
+          scrapDate: dto.scrapDate ? new Date(dto.scrapDate) : new Date(),
+          scrapValue: dto.scrapValue ?? 0,
+          scrapNotes: dto.notes,
+          scrapBy: userId,
+          projectAssignment: null,
+        },
+      },
+      { new: true },
+    ).lean();
+
+    this.logger.log(`Equipment ${eq.equipmentCode} scrapped by ${userId}`);
+    return { message: 'Equipment scrapped successfully', data: updated };
+  }
 }

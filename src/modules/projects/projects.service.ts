@@ -110,6 +110,43 @@ export class ProjectsService {
     return updated;
   }
 
+  // ─── Create (Manual) ───────────────────────────────────────────────────────
+  async create(dto: any, userId: string) {
+    const code = (dto.code || '').toUpperCase();
+    const existing = await this.projectModel.findOne({ code });
+    if (existing) {
+      throw new Error(`Project with code "${code}" already exists`);
+    }
+    const project = await this.projectModel.create({
+      ...dto,
+      code,
+      createdBy: userId,
+    });
+    this.logger.log(`Project ${code} created manually by ${userId}`);
+    return project;
+  }
+
+  // ─── Update (Full / Partial) ───────────────────────────────────────────────
+  async update(code: string, dto: any, userId: string) {
+    const project = await this.projectModel.findOne({ code: code.toUpperCase() });
+    if (!project) throw new NotFoundException(`Project "${code}" not found`);
+
+    // Prevent overwriting protected fields
+    const { code: _c, createdBy: _cb, ...safeDto } = dto;
+
+    const updated = await this.projectModel
+      .findOneAndUpdate(
+        { code: code.toUpperCase() },
+        { $set: safeDto },
+        { new: true },
+      )
+      .lean()
+      .exec();
+
+    this.logger.log(`Project ${code} updated by ${userId}`);
+    return updated;
+  }
+
   // ─── Internal: update consumed value (called by field ops) ─────────────────
   async addToConsumedValue(projectId: string, amount: number) {
     return this.projectModel.findByIdAndUpdate(

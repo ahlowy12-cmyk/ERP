@@ -39,6 +39,7 @@ import { BudgetController } from './budget/budget.controller';
 import { DepreciationController } from './depreciation/depreciation.controller';
 import { VatController } from './vat/vat.controller';
 import { StatementsController } from './statements/statements.controller';
+import { FinanceAliasController } from './finance-alias.controller';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { StatementsController } from './statements/statements.controller';
     DepreciationController,
     VatController,
     StatementsController,
+    FinanceAliasController,
   ],
   exports: [
     CoaService,

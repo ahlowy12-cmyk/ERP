@@ -25,6 +25,8 @@ import { DepartmentsModule } from './modules/admin/departments/departments.modul
 import { PurchaseRequestsModule } from './modules/procurement/purchase-requests/purchase-requests.module';
 import { PurchaseOrdersModule } from './modules/procurement/purchase-orders/purchase-orders.module';
 import { MrvsModule } from './modules/inventory/mrvs/mrvs.module';
+import { ReportsModule as InventoryReportsModule } from './modules/inventory/reports/reports.module';
+import { InventoryAliasModule } from './modules/inventory/inventory-alias.module';
 
 // 🏗️ Phase 1 — Master Data & Contracts
 import { EquipmentModule } from './modules/assets/equipment/equipment.module';
@@ -102,6 +104,7 @@ import { FinanceModule } from './modules/finance/finance.module';
     PurchaseRequestsModule,
     PurchaseOrdersModule,
     MrvsModule,
+    InventoryAliasModule,
 
     // 8. Phase 1 — Master Assets, Contracts, Projects, Cost Centers
     EquipmentModule,

@@ -57,4 +57,12 @@ export class CoaController {
   remove(@Param('id') id: string) {
     return this.coaService.remove(id);
   }
+
+  // Alias: GET /api/v1/finance/accounts → same as GET /finance/coa (frontend compatibility)
+  @Get('/accounts-alias')
+  @Roles(UserRole.SuperAdmin, UserRole.GeneralManager, UserRole.FinanceManager)
+  @RequirePermissions('view:finance')
+  findAllAlias(@Query('type') type?: string, @Query('parentId') parentId?: string) {
+    return this.coaService.findAll({ type, parentCode: parentId });
+  }
 }

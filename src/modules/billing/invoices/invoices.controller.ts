@@ -43,6 +43,15 @@ export class InvoicesController {
     @CurrentUser('id') userId: string,
   ) { return this.svc.createFromWCC(dto, userId); }
 
+  // POST /api/v1/workflow/invoices/:id/post-gl — ترحيل القيد المحاسبي للدفتر العام
+  @Post('invoices/:id/post-gl')
+  @Roles(UserRole.SuperAdmin, UserRole.GeneralManager, UserRole.FinanceManager)
+  @RequirePermissions('approve:finance')
+  postGL(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) { return this.svc.postGL(id, userId); }
+
   // ── GL Journal Entries ──────────────────────────────────────────────────
 
   // GET /api/v1/workflow/journal-entries — Finance & Management view

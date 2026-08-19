@@ -30,12 +30,19 @@ export class InspectionService {
     session.startTransaction();
 
     try {
-      const inspection = await this._InspectionRepository.findOne({
+      let inspection = await this._InspectionRepository.findOne({
         filter: { _id: id },
         options: { session },
       });
+      if (!inspection) {
+        // Fallback: Check if the ID provided is actually a poId (as per frontend docs)
+        inspection = await this._InspectionRepository.findOne({
+          filter: { poId: id },
+          options: { session },
+        });
+      }
       if (!inspection)
-        throw new NotFoundException('Inspection Request not found');
+        throw new NotFoundException('Inspection Request not found for the given ID or PO ID');
       if (inspection.status !== 'Pending')
         throw new BadRequestException('Inspection already processed');
 
@@ -97,14 +104,21 @@ export class InspectionService {
     session.startTransaction();
 
     try {
-      const inspection = await this._InspectionRepository.findOne({
+      let inspection = await this._InspectionRepository.findOne({
         filter: { _id: inspectionId },
         options: { session },
       });
+      if (!inspection) {
+        // Fallback: Check if the ID provided is actually a poId
+        inspection = await this._InspectionRepository.findOne({
+          filter: { poId: inspectionId },
+          options: { session },
+        });
+      }
       if (!inspection)
-        throw new NotFoundException('Inspection Request not found');
+        throw new NotFoundException('Inspection Request not found for the given ID or PO ID');
 
-      // هنا تفترض إضافة دالة generateNcrNumber في NumberingService مستقبلاً
+      // إنشاء التقرير
       const ncrNumber = await this._NumberingService.generateMIVNumber(); // Placeholder للتجربة حتى تحديث NumberingService بـ NCR
       const realNcrNumber = ncrNumber.replace('MIV', 'NCR');
 

@@ -232,6 +232,22 @@ export class InvoicesService {
     }
   }
 
+  // ─── Post GL ─────────────────────────────────────────────────────────────
+  async postGL(id: string, userId: string) {
+    const invoice = await this.invoiceModel.findById(id);
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status !== 'Draft') throw new BadRequestException('Invoice is already posted or in another state');
+
+    const updated = await this.invoiceModel.findByIdAndUpdate(
+      id,
+      { $set: { status: 'Posted', postedBy: new Types.ObjectId(userId), postedAt: new Date() } },
+      { new: true },
+    ).lean();
+
+    this.logger.log(`✅ Invoice ${updated.invoiceNumber} posted by ${userId}`);
+    return updated;
+  }
+
   // ─── List GL Entries ────────────────────────────────────────────────────
   async getGLEntries(query: { sourceType?: string; page?: number; limit?: number }) {
     const { sourceType, page = 1, limit = 20 } = query;

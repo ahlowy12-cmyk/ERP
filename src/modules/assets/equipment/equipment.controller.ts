@@ -64,4 +64,34 @@ export class EquipmentController {
   remove(@Param('id') id: string) {
     return this.equipmentService.remove(id);
   }
+
+  // POST /api/v1/assets/equipment/:id/assign — إسناد معدة لمشروع أو سائق
+  @Post(':id/assign')
+  assign(
+    @Param('id') id: string,
+    @Body() dto: { projectCode?: string; projectId?: string; assignedTo?: string; notes?: string },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.equipmentService.assign(id, dto, userId);
+  }
+
+  // POST /api/v1/assets/equipment/:id/transfer — نقل معدة بين مواقع
+  @Post(':id/transfer')
+  transfer(
+    @Param('id') id: string,
+    @Body() dto: { toProjectCode?: string; toLocation?: string; reason?: string; transferDate?: string },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.equipmentService.transfer(id, dto, userId);
+  }
+
+  // POST /api/v1/assets/equipment/:id/scrap — تخريد واستبعاد معدة
+  @Post(':id/scrap')
+  scrap(
+    @Param('id') id: string,
+    @Body() dto: { reason: string; scrapDate?: string; scrapValue?: number; notes?: string },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.equipmentService.scrap(id, dto, userId);
+  }
 }

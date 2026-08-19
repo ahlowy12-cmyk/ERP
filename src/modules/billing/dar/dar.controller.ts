@@ -46,6 +46,17 @@ export class DARController {
     return this.svc.create(dto, userId);
   }
 
+  @Patch(':id/submit')
+  @Roles(
+    UserRole.SuperAdmin, UserRole.GeneralManager,
+    UserRole.OperationsManager, UserRole.ProjectManager,
+  )
+  @RequirePermissions('edit:timesheets')
+  submit(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) { return this.svc.submit(id, userId); }
+
   @Patch(':id/approve')
   @Roles(UserRole.SuperAdmin, UserRole.GeneralManager, UserRole.OperationsManager)
   @RequirePermissions('approve:projects')

@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Param,
   Body,
@@ -49,6 +50,25 @@ export class ProjectsController {
   @Get(':code/cost-summary')
   getCostSummary(@Param('code') code: string) {
     return this.projectsService.getCostSummary(code);
+  }
+
+  // POST /api/v1/projects — إنشاء مشروع يدوي جديد
+  @Post()
+  create(
+    @Body() dto: any,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.projectsService.create(dto, userId);
+  }
+
+  // PATCH /api/v1/projects/:code — تعديل بيانات المشروع كاملة
+  @Patch(':code')
+  update(
+    @Param('code') code: string,
+    @Body() dto: any,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.projectsService.update(code, dto, userId);
   }
 
   // PATCH /api/v1/projects/:code/status

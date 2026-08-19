@@ -106,6 +106,23 @@ export class DARService {
     return dar;
   }
 
+  // ─── Submit ───────────────────────────────────────────────────────────────
+  async submit(id: string, userId: string) {
+    const dar = await this.darModel.findById(id);
+    if (!dar) throw new NotFoundException('DAR not found');
+    if (dar.status === 'Submitted') throw new BadRequestException('DAR is already submitted');
+    if (dar.status === 'Approved') throw new BadRequestException('Approved DAR cannot be re-submitted');
+
+    const updated = await this.darModel.findByIdAndUpdate(
+      id,
+      { $set: { status: 'Submitted', submittedBy: new Types.ObjectId(userId), submittedAt: new Date() } },
+      { new: true },
+    ).lean();
+
+    this.logger.log(`DAR submitted: ${id} by ${userId}`);
+    return updated;
+  }
+
   // ─── Approve ──────────────────────────────────────────────────────────────
   async approve(id: string, dto: { clientRepName?: string; clientSignature?: string }, userId: string) {
     const dar = await this.darModel.findById(id);
